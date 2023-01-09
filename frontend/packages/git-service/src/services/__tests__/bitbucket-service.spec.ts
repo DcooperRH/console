@@ -40,7 +40,7 @@ describe('Bitbucket Service', () => {
 
     return nockBack('repo-not-reachable.json').then(async ({ nockDone, context }) => {
       const repoStatus = await gitService.isRepoReachable();
-      expect(repoStatus).toEqual(RepoStatus.Unreachable);
+      expect(repoStatus).toEqual(RepoStatus.ResourceNotFound);
       context.assertScopesFinished();
       nockDone();
     });
@@ -230,6 +230,36 @@ describe('Bitbucket Service', () => {
     return nockBack('no-devfile.json').then(async ({ nockDone, context }) => {
       const isDevfilePresent = await gitService.isDevfilePresent();
       expect(isDevfilePresent).toBe(false);
+      context.assertScopesFinished();
+      nockDone();
+    });
+  });
+
+  it('should detect .tekton folder', () => {
+    const gitSource = {
+      url: 'https://bitbucket.org/avikkundu/oc-pipe',
+    };
+
+    const gitService = new BitbucketService(gitSource);
+
+    return nockBack('tekton.json').then(async ({ nockDone, context }) => {
+      const isTektonFolderPresent = await gitService.isTektonFolderPresent();
+      expect(isTektonFolderPresent).toBe(true);
+      context.assertScopesFinished();
+      nockDone();
+    });
+  });
+
+  it('should not detect .tekton folder', () => {
+    const gitSource: GitSource = {
+      url: 'https://bitbucket.org/akshinde/testgitsource',
+    };
+
+    const gitService = new BitbucketService(gitSource);
+
+    return nockBack('no-tekton.json').then(async ({ nockDone, context }) => {
+      const isTektonFolderPresent = await gitService.isTektonFolderPresent();
+      expect(isTektonFolderPresent).toBe(false);
       context.assertScopesFinished();
       nockDone();
     });

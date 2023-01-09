@@ -25,6 +25,17 @@
   margin-top: -15px;
 }
 
+.pf-c-modal-box {
+  .custom-time-range-modal {
+    overflow: visible;
+    padding: var(--pf-c-modal-box__body--PaddingTop) var(--pf-c-modal-box__body--PaddingLeft);
+  }
+
+  .custom-time-range-modal-footer {
+    padding-top: var(--pf-c-modal-box__body--PaddingTop);
+  }
+}
+
 .graph-empty-state {
   min-height: 310px;
   &__loaded {
@@ -79,12 +90,17 @@
   }
 }
 
+.monitoring-breadcrumbs {
+  padding-bottom: var(--pf-global--spacer--sm);
+}
+
 .monitoring-dashboards__card {
   height: calc(100% - 20px);
   margin: 0 0 20px 0;
 
   .co-dashboard-card__body--dashboard {
-    // Add extra padding to the right. X-axis times with AM/PM at certain screen widths can overflow the card otherwise.
+    // Add extra padding to the right. X-axis times with AM/PM at certain screen widths can overflow
+    // the card otherwise.
     padding: 10px 15px 10px 10px;
   }
 
@@ -264,7 +280,8 @@ $monitoring-line-height: 18px;
 }
 
 .monitoring-description {
-  // Limit to $num-lines lines of text. Truncate with an ellipsis in WebKit. Just overflow hidden for other browsers.
+  // Limit to $num-lines lines of text. Truncate with an ellipsis in WebKit. Just overflow hidden
+  // for other browsers.
   $num-lines: 2;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -290,6 +307,18 @@ $monitoring-line-height: 18px;
 
 .monitoring-icon-wrap {
   margin-right: 10px;
+}
+
+.monitoring-alert-detail-toolbar.pf-c-toolbar  {
+  padding-top: 0;
+
+  .pf-c-toolbar__content{
+    padding: 0;
+  }
+
+  .co-section-heading{
+    margin: 0;
+  }
 }
 
 .monitoring-silence-alert {
@@ -390,14 +419,6 @@ $monitoring-line-height: 18px;
   max-height: 25vh;
   overflow: auto;
   width: 100%;
-
-  &--insert {
-    @media (min-width: $screen-sm-min) {
-      max-width: 55vw;
-    }
-    max-width: 85vw;
-    width: 550px;
-  }
 }
 
 .query-browser__query {
@@ -455,13 +476,14 @@ $monitoring-line-height: 18px;
   }
 }
 
-.query-browser__span-dropdown-menu {
-  right: 1px;
-  width: 130px;
-}
+// Match the width of the combined text input and dropdown button input group and the dropdown menu
+.query-browser__span {
+  $width: 130px;
+  max-width: $width;
 
-.query-browser__span-text {
-  max-width: 79px;
+  .query-browser__span-dropdown-item {
+    width: $width - 1px;
+  }
 }
 
 .query-browser__table {
@@ -489,14 +511,19 @@ $monitoring-line-height: 18px;
   }
 }
 
+.query-browser__table-wrapper .query-browser__series-select-all-btn {
+  margin-top: var(--pf-global--spacer--md);
+}
+
 .query-browser__table-message {
   border-bottom: solid 1px var(--pf-global--BorderColor--100);
   padding: 10px 20px;
 }
 
-.query-browser__toggle-graph {
-  margin-bottom: 5px;
-  float: right;
+.query-browser__toggle-graph-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--pf-global--spacer--xs);
 }
 
 .query-browser__tooltip {
@@ -583,6 +610,7 @@ $monitoring-line-height: 18px;
   &:focus {
     outline: none;
   }
+  height: 200px;
 }
 
 .query-browser__zoom-overlay {

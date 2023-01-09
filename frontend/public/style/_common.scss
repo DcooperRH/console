@@ -64,14 +64,9 @@ dl.co-inline {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  .co-m-pane__filter-bar-dropdown,
   .co-m-primary-action,
   .pf-c-form-control {
     margin-bottom: 10px;
-  }
-  .co-m-pane__filter-bar-dropdown {
-    margin-right: 10px;
-    min-width: 0; // enables truncation of selected item, if needed
   }
 }
 
@@ -342,6 +337,14 @@ dl.co-inline {
 
 .co-sidebar-dismiss {
   padding: 0 5px;
+}
+
+// PatternFly's TextList lacks a plain variant
+// see https://github.com/patternfly/patternfly-react/issues/8434
+.co-text-list-plain {
+  list-style: none !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
 }
 
 .co-toolbar {

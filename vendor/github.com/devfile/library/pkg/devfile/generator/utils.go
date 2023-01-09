@@ -1,3 +1,18 @@
+//
+// Copyright 2022 Red Hat, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package generator
 
 import (
@@ -46,7 +61,12 @@ func convertPorts(endpoints []v1.Endpoint) []corev1.ContainerPort {
 		} else {
 			portProtocol = corev1.ProtocolTCP
 		}
-		name := fmt.Sprintf("%d-%s", portNumber, strings.ToLower(string(portProtocol)))
+		name := endpoint.Name
+		if len(name) > 15 {
+			// to be compatible with endpoint longer than 15 chars
+			name = fmt.Sprintf("port-%v", portNumber)
+		}
+
 		if _, exist := portMap[name]; !exist {
 			portMap[name] = true
 			containerPorts = append(containerPorts, corev1.ContainerPort{
@@ -228,6 +248,7 @@ func getPodTemplateSpec(podTemplateSpecParams podTemplateSpecParams) *corev1.Pod
 type deploymentSpecParams struct {
 	PodTemplateSpec   corev1.PodTemplateSpec
 	PodSelectorLabels map[string]string
+	Replicas          *int32
 }
 
 // getDeploymentSpec gets a deployment spec
@@ -240,6 +261,7 @@ func getDeploymentSpec(deploySpecParams deploymentSpecParams) *appsv1.Deployment
 			MatchLabels: deploySpecParams.PodSelectorLabels,
 		},
 		Template: deploySpecParams.PodTemplateSpec,
+		Replicas: deploySpecParams.Replicas,
 	}
 
 	return deploymentSpec
@@ -268,7 +290,6 @@ func getServiceSpec(devfileObj parser.DevfileObj, selectorLabels map[string]stri
 			}
 			// if Exposure == none, should not create a service for that port
 			if !portExist && portExposureMap[int(port.ContainerPort)] != v1.NoneEndpointExposure {
-				port.Name = fmt.Sprintf("port-%v", port.ContainerPort)
 				containerPorts = append(containerPorts, port)
 			}
 		}
@@ -601,4 +622,40 @@ func getAllContainers(devfileObj parser.DevfileObj, options common.DevfileOption
 		containers = append(containers, *container)
 	}
 	return containers, nil
+}
+
+// getContainerAnnotations iterates through container components and returns all annotations
+func getContainerAnnotations(devfileObj parser.DevfileObj, options common.DevfileOptions) (v1.Annotation, error) {
+	options.ComponentOptions = common.ComponentOptions{
+		ComponentType: v1.ContainerComponentType,
+	}
+	containerComponents, err := devfileObj.Data.GetComponents(options)
+	if err != nil {
+		return v1.Annotation{}, err
+	}
+	var annotations v1.Annotation
+	annotations.Service = make(map[string]string)
+	annotations.Deployment = make(map[string]string)
+	for _, comp := range containerComponents {
+		// ToDo: dedicatedPod support: https://github.com/devfile/api/issues/670
+		if comp.Container.DedicatedPod != nil && *comp.Container.DedicatedPod {
+			continue
+		}
+		if comp.Container.Annotation != nil {
+			mergeMaps(annotations.Service, comp.Container.Annotation.Service)
+			mergeMaps(annotations.Deployment, comp.Container.Annotation.Deployment)
+		}
+	}
+
+	return annotations, nil
+}
+
+func mergeMaps(dest map[string]string, src map[string]string) map[string]string {
+	if dest == nil {
+		dest = make(map[string]string)
+	}
+	for k, v := range src {
+		dest[k] = v
+	}
+	return dest
 }

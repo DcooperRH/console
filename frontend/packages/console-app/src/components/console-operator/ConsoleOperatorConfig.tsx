@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button } from '@patternfly/react-core';
+import { Alert, Button } from '@patternfly/react-core';
 import { PencilAltIcon } from '@patternfly/react-icons';
 import {
   ISortBy,
@@ -11,14 +11,21 @@ import {
   TableHeader,
   TableVariant,
 } from '@patternfly/react-table';
+import * as _ from 'lodash';
 import { useTranslation } from 'react-i18next';
-import { WatchK8sResource } from '@console/dynamic-plugin-sdk';
+import { useAccessReview, WatchK8sResource } from '@console/dynamic-plugin-sdk';
 import { breadcrumbsForGlobalConfig } from '@console/internal/components/cluster-settings/global-config';
 import { DetailsForKind } from '@console/internal/components/default-resource';
 import { DetailsPage } from '@console/internal/components/factory';
-import { EmptyBox, LoadingBox, navFactory, ResourceLink } from '@console/internal/components/utils';
+import {
+  asAccessReview,
+  EmptyBox,
+  KebabAction,
+  LoadingBox,
+  navFactory,
+  ResourceLink,
+} from '@console/internal/components/utils';
 import { useK8sWatchResource } from '@console/internal/components/utils/k8s-watch-hook';
-import { useAccessReview } from '@console/internal/components/utils/rbac';
 import { ConsoleOperatorConfigModel, ConsolePluginModel } from '@console/internal/models';
 import {
   ConsolePluginKind,
@@ -26,10 +33,14 @@ import {
   K8sResourceKindReference,
   referenceForModel,
 } from '@console/internal/module/k8s';
-import { isLoadedDynamicPluginInfo } from '@console/plugin-sdk/src';
+import {
+  isLoadedDynamicPluginInfo,
+  isNotLoadedDynamicPluginInfo,
+  LoadedDynamicPluginInfo,
+  NotLoadedDynamicPluginInfo,
+} from '@console/plugin-sdk/src';
 import { useDynamicPluginInfo } from '@console/plugin-sdk/src/api/useDynamicPluginInfo';
-import { consolePluginModal } from '@console/shared/src/components/modals';
-import { CONSOLE_OPERATOR_CONFIG_NAME } from '@console/shared/src/constants';
+import { consolePluginModal, CONSOLE_OPERATOR_CONFIG_NAME, Status } from '@console/shared';
 
 const consoleOperatorConfigReference: K8sResourceKindReference = referenceForModel(
   ConsoleOperatorConfigModel,
@@ -85,23 +96,60 @@ const ConsolePluginsList: React.FC<ConsolePluginsListType> = ({ obj }) => {
   const [pluginInfoEntries] = useDynamicPluginInfo();
   const [rows, setRows] = React.useState([]);
   const [sortBy, setSortBy] = React.useState<ISortBy>({});
+  const pluginColumns = ['name', 'version', 'description', 'status'];
   React.useEffect(() => {
     const data = consolePlugins.map((plugin) => {
       const pluginName = plugin?.metadata?.name;
       const loadedPluginInfo = pluginInfoEntries
         .filter(isLoadedDynamicPluginInfo)
-        .find((i) => i?.metadata?.name === pluginName);
+        .find(
+          (i: LoadedDynamicPluginInfo) => i?.metadata?.name === pluginName,
+        ) as LoadedDynamicPluginInfo;
+      const notLoadedPluginInfo = pluginInfoEntries
+        .filter(isNotLoadedDynamicPluginInfo)
+        .find(
+          (i: NotLoadedDynamicPluginInfo) => i?.pluginName === pluginName,
+        ) as NotLoadedDynamicPluginInfo;
       const enabled = !!obj?.spec?.plugins?.includes(pluginName);
+      if (loadedPluginInfo) {
+        return {
+          name: plugin?.metadata?.name,
+          version: loadedPluginInfo?.metadata?.version,
+          description: loadedPluginInfo?.metadata?.description,
+          enabled,
+          status: loadedPluginInfo?.status,
+        };
+      }
       return {
         name: plugin?.metadata?.name,
-        version: loadedPluginInfo?.metadata?.version,
-        description: loadedPluginInfo?.metadata?.description,
         enabled,
+        status: notLoadedPluginInfo?.status,
+        errorMessage:
+          notLoadedPluginInfo?.status !== 'Pending' ? notLoadedPluginInfo?.errorMessage : undefined,
+        errorCause:
+          notLoadedPluginInfo?.status !== 'Pending'
+            ? notLoadedPluginInfo?.errorCause?.toString()
+            : undefined,
       };
     });
     const placeholder = '-';
+    const sortedData = !_.isEmpty(sortBy)
+      ? data.sort((a, b) => {
+          const sortCol = pluginColumns[sortBy.index];
+          if ((a[sortCol] || placeholder) < (b[sortCol] || placeholder)) {
+            return -1;
+          }
+          if ((a[sortCol] || placeholder) > (b[sortCol] || placeholder)) {
+            return 1;
+          }
+          return 0;
+        })
+      : data;
+    if (sortBy && sortBy?.direction === SortByDirection.desc) {
+      sortedData.reverse();
+    }
     setRows(
-      data?.map((item) => {
+      sortedData?.map((item) => {
         return {
           cells: [
             {
@@ -115,6 +163,15 @@ const ConsolePluginsList: React.FC<ConsolePluginsListType> = ({ obj }) => {
             },
             item.version || placeholder,
             item.description || placeholder,
+            item.status
+              ? {
+                  title: (
+                    <Status status={item.status} title={item.status}>
+                      {item.errorMessage} <br /> {item.errorCause}
+                    </Status>
+                  ),
+                }
+              : placeholder,
             {
               title: <ConsolePluginStatus plugin={item.name} enabled={item.enabled} />,
             },
@@ -122,7 +179,8 @@ const ConsolePluginsList: React.FC<ConsolePluginsListType> = ({ obj }) => {
         };
       }),
     );
-  }, [consolePlugins, pluginInfoEntries, obj]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consolePlugins, pluginInfoEntries, obj, sortBy]);
   const headers = [
     {
       title: t('console-app~Name'),
@@ -136,21 +194,31 @@ const ConsolePluginsList: React.FC<ConsolePluginsListType> = ({ obj }) => {
       title: t('console-app~Description'),
       transforms: [sortable],
     },
+    {
+      title: t('console-app~Status'),
+      transforms: [sortable],
+    },
     { title: '' },
   ];
   const onSort = (e, index, direction) => {
-    const sortedRows = rows.sort((a, b) =>
-      a[index] < b[index] ? -1 : a[index] > b[index] ? 1 : 0,
-    );
     setSortBy({
       index,
       direction,
     });
-    setRows(direction === SortByDirection.asc ? sortedRows : sortedRows.reverse());
   };
 
   return consolePluginsLoaded ? (
     <div className="co-m-pane__body">
+      {obj.spec?.managementState === 'Unmanaged' && (
+        <Alert
+          className="co-alert"
+          variant="info"
+          isInline
+          title={t(
+            'console-app~Console operator spec.managementState is unmanaged. Changes to plugins will have no effect.',
+          )}
+        />
+      )}
       {rows.length ? (
         <Table
           aria-label={t('console-app~Console plugins table')}
@@ -187,11 +255,27 @@ export const ConsoleOperatorConfigDetailsPage: React.FC<React.ComponentProps<
     },
   ];
 
+  const menuActions: KebabAction[] = [
+    () => ({
+      // t('console-app~Customize')
+      labelKey: 'console-app~Customize',
+      labelKind: { kind: ConsoleOperatorConfigModel.kind },
+      dataTest: `Customize`,
+      href: '/cluster-configuration',
+      accessReview: asAccessReview(
+        ConsoleOperatorConfigModel,
+        { spec: { name: 'cluster' } },
+        'patch',
+      ),
+    }),
+  ];
+
   return (
     <DetailsPage
       {...props}
       kind={consoleOperatorConfigReference}
       pages={pages}
+      menuActions={menuActions}
       breadcrumbsFor={() =>
         breadcrumbsForGlobalConfig(ConsoleOperatorConfigModel.label, props.match.url)
       }

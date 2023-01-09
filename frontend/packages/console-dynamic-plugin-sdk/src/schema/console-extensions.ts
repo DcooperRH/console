@@ -5,6 +5,7 @@ import {
   ClusterOverviewInventoryItem,
   ClusterOverviewUtilizationItem,
   ClusterOverviewMultilineUtilizationItem,
+  CustomOverviewDetailItem,
   OverviewDetailItem,
 } from '../extensions/cluster-overview';
 import { ClusterGlobalConfig } from '../extensions/cluster-settings';
@@ -31,7 +32,7 @@ import {
   FeatureFlagHookProvider,
 } from '../extensions/feature-flags';
 import { FileUpload } from '../extensions/file-upload';
-import { HorizontalNavTab } from '../extensions/horizontal-nav-tabs';
+import { HorizontalNavTab, NavTab } from '../extensions/horizontal-nav-tabs';
 import { ImportEnvironment } from '../extensions/import-environments';
 import {
   HrefNavItem,
@@ -56,6 +57,7 @@ import {
 import { PVCCreateProp, PVCStatus, PVCAlert, PVCDelete } from '../extensions/pvc';
 import { ReduxReducer } from '../extensions/redux';
 import { ModelMetadata } from '../extensions/resource-metadata';
+import { StorageClassProvisioner } from '../extensions/storage-class-provisioner';
 import { StorageProvider } from '../extensions/storage-provider';
 import { TelemetryListener } from '../extensions/telemetry';
 import {
@@ -127,12 +129,15 @@ export type SupportedExtension =
   | UserPreferenceItem
   | Perspective
   | HorizontalNavTab
+  | NavTab
   | ClusterOverviewInventoryItem
   | ClusterOverviewUtilizationItem
   | ClusterOverviewMultilineUtilizationItem
   | OverviewDetailItem
+  | CustomOverviewDetailItem
   | ProjectOverviewUtilizationItem
-  | ProjectOverviewInventoryItem;
+  | ProjectOverviewInventoryItem
+  | StorageClassProvisioner;
 
 /**
  * Schema of Console plugin's `console-extensions.json` file.

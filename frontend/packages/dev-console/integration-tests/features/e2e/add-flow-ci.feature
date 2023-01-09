@@ -16,10 +16,10 @@ Feature: Create the different workloads from Add page
               And user will see "Samples" option
               And user will see Import YAML, Upload JAR file under From Local Machine section
 
-        Scenario Outline: Deploy Application using Catalog Template "<template_type>": A-01-TC02
+        Scenario Outline: Deploy Application using Catalog Template "<template_category>": A-01-TC02
             Given user is at Developer Catalog page
               And user is at Templates page
-             When user selects "<template_type>" from Templates type
+             When user selects Template category "<template_category>"
               And user searches and selects Template card "<card_name>" from catalog page
               And user clicks Instantiate Template button on side bar
               And user clicks create button on Instantiate Template page
@@ -27,12 +27,12 @@ Feature: Create the different workloads from Add page
               And user is able to see workload "<workload_name>" in topology page
 
         Examples:
-                  | template_type | card_name                             | workload_name             |
-                  | CI/CD         | Jenkins                               | jenkins                   |
-                  | Databases     | MariaDB                               | mariadb                   |
-                  | Languages     | Node.js + PostgreSQL (Ephemeral)      | nodejs-postgresql-example |
-                  | Middleware    | Apache HTTP Server                    | httpd-example             |
-                  | Other         | Nginx HTTP server and a reverse proxy | nginx-example             |
+                  | template_category | card_name                             | workload_name             |
+                  | CI/CD             | Jenkins                               | jenkins                   |
+                  | Databases         | MariaDB                               | mariadb                   |
+                  | Languages         | Node.js + PostgreSQL (Ephemeral)      | nodejs-postgresql-example |
+                  | Middleware        | Apache HTTP Server                    | httpd-example             |
+                  | Other             | Nginx HTTP server and a reverse proxy | nginx-example             |
 
         Scenario Outline: Deploy <image> image with Runtime icon from external registry: A-02-TC02
             Given user is at Deploy Image page
@@ -100,7 +100,7 @@ Feature: Create the different workloads from Add page
             Given user is on Import from Git form
              When user enters Git Repo URL as "https://github.com/rohitkrai03/flask-dockerfile-example"
               And user enters Name as "<name>" in Docker file page
-              And user selects "<resource_type>" radio button in Resource type section
+              And user selects "<resource_type>" in Resource type section
               And user clicks Create button on Add page
              Then user will be redirected to Topology page
               And user is able to see workload "<name>" in topology page
@@ -121,5 +121,19 @@ Feature: Create the different workloads from Add page
              When user clicks on the Upload JAR file card
              Then user is able to see Upload jar file, Optional java commands, Run time Icon and Builder Image version fields displayed in JAR section
               And Application Name, Name fields displayed in General section
-              And Resources section, Advanced options sections are displayed
+              And Advanced options sections are displayed
               And Create button is in disabled state
+
+        Scenario Outline: Create Sample Application from Add page: GS-03-TC05
+            Given user is at Add page
+             When user clicks on the Samples card
+              And user selects "<card_name>" sample from Samples
+              And user is able to see the form header name as "<form_header>"
+              And user clicks on Create button
+             Then user will be redirected to Topology page
+              And user is able to see workload "<workload_name>" in topology page list view
+              
+        Examples:
+                  | card_name | form_header               | workload_name |
+                  | Httpd     | Create Sample application | httpd-sample  |
+                  | Basic Go  | Import from Git           | go-basic      |

@@ -257,6 +257,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
               }
             }}
             placeholder="Search"
+            minSearchChars={0}
           />
         </div>
         {showDebugAction(resource, containerName) && !isWindowsPod(resource) && (
@@ -281,7 +282,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
           </Tooltip>
         )}
       </div>
-      <div className="co-toolbar__group co-toolbar__group--right">
+      <div className="co-toolbar__group co-toolbar__group--right" data-test="log-links">
         {!_.isEmpty(podLogLinks) &&
           _.map(_.sortBy(podLogLinks, 'metadata.name'), (link) => {
             const namespace = resource.metadata.namespace;
@@ -401,6 +402,19 @@ export const ResourceLog: React.FC<ResourceLogProps> = ({
     false,
     true,
   );
+  const hasWrapAnnotation =
+    resource?.metadata?.annotations?.['console.openshift.io/wrap-log-lines'] === 'true';
+
+  const [wrapLinesCheckbox, setWrapLinesCheckbox] = React.useState(wrapLines || hasWrapAnnotation);
+  const firstRender = React.useRef(true);
+
+  React.useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setWrapLines(wrapLinesCheckbox);
+  }, [wrapLinesCheckbox, setWrapLines]);
 
   const timeoutIdRef = React.useRef(null);
   const countRef = React.useRef(0);
@@ -589,8 +603,8 @@ export const ResourceLog: React.FC<ResourceLogProps> = ({
       containerName={containerName}
       podLogLinks={podLogLinks}
       namespaceUID={namespaceUID}
-      toggleWrapLines={setWrapLines}
-      isWrapLines={wrapLines}
+      toggleWrapLines={setWrapLinesCheckbox}
+      isWrapLines={wrapLinesCheckbox}
       hasPreviousLog={hasPreviousLogs}
       changeLogType={setLogType}
       logType={logType}
@@ -662,7 +676,7 @@ export const ResourceLog: React.FC<ResourceLogProps> = ({
             data={content}
             ref={logViewerRef}
             height="100%"
-            isTextWrapped={wrapLines}
+            isTextWrapped={wrapLinesCheckbox}
             toolbar={logControls}
             footer={
               <FooterButton
@@ -674,6 +688,7 @@ export const ResourceLog: React.FC<ResourceLogProps> = ({
               />
             }
             onScroll={onScroll}
+            initialIndexWidth={7}
           />
         </div>
       </div>
@@ -692,7 +707,7 @@ type LogControlsProps = {
   namespaceUID?: string;
   toggleStreaming?: () => void;
   toggleFullscreen: () => void;
-  toggleWrapLines: (wrapLines: boolean) => void;
+  toggleWrapLines: (wrapLinesCheckbox: boolean) => void;
   isWrapLines: boolean;
   changeLogType: (type: LogTypeStatus) => void;
   hasPreviousLog?: boolean;

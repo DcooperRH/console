@@ -58,9 +58,13 @@
 56.  [`ResourceEventStream`](#resourceeventstream)
 57.  [`usePrometheusPoll`](#useprometheuspoll)
 58.  [`Timestamp`](#timestamp)
-59. [DEPRECATED] [`PerspectiveContext`](#perspectivecontext)
-60. [DEPRECATED] [`useAccessReviewAllowed`](#useaccessreviewallowed)
-61. [DEPRECATED] [`useSafetyFirst`](#usesafetyfirst)
+59.  [`useModal`](#usemodal)
+60.  [`ActionServiceProvider`](#actionserviceprovider)
+61.  [`NamespaceBar`](#namespacebar)
+62.  [`ErrorBoundaryFallbackPage`](#errorboundaryfallbackpage)
+63. [DEPRECATED] [`PerspectiveContext`](#perspectivecontext)
+64. [DEPRECATED] [`useAccessReviewAllowed`](#useaccessreviewallowed)
+65. [DEPRECATED] [`useSafetyFirst`](#usesafetyfirst)
 
 ---
 
@@ -1076,7 +1080,7 @@ const Component: React.FC = () => {
   const watchRes = {
         ...
       }
-  const [data, loaded, error] = UseK8sWatchResource(watchRes)
+  const [data, loaded, error] = useK8sWatchResource(watchRes)
   return ...
 }
 ```
@@ -1118,7 +1122,7 @@ const Component: React.FC = () => {
         'pod': {...}
         ...
       }
-  const {deployment, pod}  = UseK8sWatchResources(watchResources)
+  const {deployment, pod} = useK8sWatchResources(watchResources)
   return ...
 }
 ```
@@ -1900,6 +1904,7 @@ A basic lazy loaded YAML editor with hover help and completion.
 | `toolbarLinks` | Array of ReactNode rendered on the toolbar links section on top of the editor. |
 | `onChange` | Callback for on code change event. |
 | `onSave` | Callback called when the command CTRL / CMD + S is triggered. |
+| `ref` | React reference to `{ editor?: IStandaloneCodeEditor }`. Using the 'editor' property, you are able to access to all methods to control the editor. For more information, visit https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.IStandaloneCodeEditor.html. |
 
 
 
@@ -2020,6 +2025,139 @@ A component to render timestamp.<br/>The timestamps are synchronized between inv
 | `simple` | render simple version of the component omitting icon and tooltip. |
 | `omitSuffix` | formats the date ommiting the suffix. |
 | `className` | additional class name for the component. |
+
+
+
+---
+
+## `useModal`
+
+### Summary 
+
+A hook to launch Modals.<br/><br/>```tsx<br/>const AppPage: React.FC = () => {<br/> const [launchModal] = useModal();<br/> const onClick = () => launchModal(ModalComponent);<br/> return (<br/>   <Button onClick={onClick}>Launch a Modal</Button><br/> )<br/>}<br/>```
+
+
+
+
+
+
+---
+
+## `ActionServiceProvider`
+
+### Summary 
+
+Component that allows to receive contributions from other plugins for the `console.action/provider` extension type.<br/>See docs: https://github.com/openshift/console/blob/master/frontend/packages/console-dynamic-plugin-sdk/docs/console-extensions.md#consoleactionprovider
+
+
+
+### Example
+
+
+```tsx
+   const context: ActionContext = { 'a-context-id': { dataFromDynamicPlugin } };
+
+   ...
+
+   <ActionServiceProvider context={context}>
+       {({ actions, options, loaded }) =>
+         loaded && (
+           <ActionMenu actions={actions} options={options} variant={ActionMenuVariant.DROPDOWN} />
+         )
+       }
+   </ActionServiceProvider>
+```
+
+
+
+
+
+### Parameters
+
+| Parameter Name | Description |
+| -------------- | ----------- |
+| `context` | Object with contextId and optional plugin data |
+
+
+
+---
+
+## `NamespaceBar`
+
+### Summary 
+
+A component that renders a horizontal toolbar with a namespace dropdown menu in the leftmost position. Additional components can be passed in as children and will be rendered to the right of the namespace dropdown. This component is designed to be used at the top of the page. It should be used on pages where the user needs to be able to change the active namespace, such as on pages with k8s resources.
+
+
+
+### Example
+
+
+```tsx
+   const logNamespaceChange = (namespace) => console.log(`New namespace: ${namespace}`);
+
+   ...
+
+   <NamespaceBar onNamespaceChange={logNamespaceChange}>
+     <NamespaceBarApplicationSelector />
+   </NamespaceBar>
+   <Page>
+
+     ...
+```
+
+
+
+
+
+### Parameters
+
+| Parameter Name | Description |
+| -------------- | ----------- |
+| `onNamespaceChange` | (optional) A function that is executed when a namespace option is selected. It accepts the new namespace in the form of a string as its only argument. The active namespace is updated automatically when an option is selected, but additional logic can be applied via this function. When the namespace is changed, the namespace parameter in the URL will be changed from the previous namespace to the newly selected namespace. |
+| `isDisabled` | (optional) A boolean flag that disables the namespace dropdown if set to true. This option only applies to the namespace dropdown and has no effect on child components. |
+| `children` | (optional) Additional elements to be rendered inside the toolbar to the right of the namespace dropdown. |
+
+
+
+---
+
+## `ErrorBoundaryFallbackPage`
+
+### Summary 
+
+Creates full page ErrorBoundaryFallbackPage component to display the "Oh no! Something went wrong."<br/>message along with the stack trace and other helpful debugging information. This is to be used in<br/>conjunction with an <ErrorBoundary> component.
+
+
+
+### Example
+
+
+ ```tsx
+ //in ErrorBoundary component
+  return (
+    if (this.state.hasError) {
+      return <ErrorBoundaryFallbackPage errorMessage={errorString} componentStack={componentStackString}
+       stack={stackTraceString} title={errorString}/>;
+    }
+
+    return this.props.children;
+  }
+ )
+```
+
+
+
+
+
+### Parameters
+
+| Parameter Name | Description |
+| -------------- | ----------- |
+| `errorMessage` | text description of the error message |
+| `componentStack` | component trace of the exception |
+| `stack` | stack trace of the exception |
+| `title` | title to render as the header of the error boundary page |
 
 
 

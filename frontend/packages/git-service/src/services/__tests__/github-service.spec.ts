@@ -40,7 +40,7 @@ describe('Github Service', () => {
 
     return nockBack('repo-not-reachable.json').then(async ({ nockDone, context }) => {
       const repoStatus = await gitService.isRepoReachable();
-      expect(repoStatus).toEqual(RepoStatus.Unreachable);
+      expect(repoStatus).toEqual(RepoStatus.PrivateRepo);
       context.assertScopesFinished();
       nockDone();
     });
@@ -265,5 +265,35 @@ describe('Github Service', () => {
     const status = await gitService.isRepoReachable();
     expect(status).toEqual(RepoStatus.Reachable);
     scope.done();
+  });
+
+  it('should detect .tekton folder', () => {
+    const gitSource = {
+      url: 'https://github.com/Lucifergene/oc-pipe',
+    };
+
+    const gitService = new GithubService(gitSource);
+
+    return nockBack('tekton.json').then(async ({ nockDone, context }) => {
+      const isTektonFolderPresent = await gitService.isTektonFolderPresent();
+      expect(isTektonFolderPresent).toBe(true);
+      context.assertScopesFinished();
+      nockDone();
+    });
+  });
+
+  it('should not detect .tekton folder', () => {
+    const gitSource: GitSource = {
+      url: 'https://github.com/redhat-developer/devconsole-git',
+    };
+
+    const gitService = new GithubService(gitSource);
+
+    return nockBack('no-tekton.json').then(async ({ nockDone, context }) => {
+      const isTektonFolderPresent = await gitService.isTektonFolderPresent();
+      expect(isTektonFolderPresent).toBe(false);
+      context.assertScopesFinished();
+      nockDone();
+    });
   });
 });

@@ -34,6 +34,23 @@ export const ServiceMonitorModel: K8sKind = {
   propagationPolicy: 'Foreground',
 };
 
+export const PodMonitorModel: K8sKind = {
+  kind: 'PodMonitor',
+  label: 'PodMonitor',
+  // t('public~PodMonitor')
+  labelKey: 'public~PodMonitor',
+  labelPlural: 'PodMonitors',
+  // t('public~PodMonitors')
+  labelPluralKey: 'public~PodMonitors',
+  apiGroup: 'monitoring.coreos.com',
+  apiVersion: 'v1',
+  abbr: 'PM',
+  namespaced: true,
+  crd: true,
+  plural: 'podmonitors',
+  propagationPolicy: 'Foreground',
+};
+
 export const AlertmanagerModel: K8sKind = {
   kind: 'Alertmanager',
   label: 'Alertmanager',
@@ -133,7 +150,7 @@ export const HorizontalPodAutoscalerModel: K8sKind = {
   // t('public~HorizontalPodAutoscaler')
   labelKey: 'public~HorizontalPodAutoscaler',
   plural: 'horizontalpodautoscalers',
-  apiVersion: 'v2beta2',
+  apiVersion: 'v2',
   apiGroup: 'autoscaling',
   abbr: 'HPA',
   namespaced: true,
@@ -1231,7 +1248,7 @@ export const ConsolePluginModel: K8sKind = {
   label: 'ConsolePlugin',
   // t('public~ConsolePlugin')
   labelKey: 'public~ConsolePlugin',
-  apiVersion: 'v1alpha1',
+  apiVersion: 'v1',
   apiGroup: 'console.openshift.io',
   plural: 'consoleplugins',
   abbr: 'CP',

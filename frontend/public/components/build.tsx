@@ -120,6 +120,7 @@ export enum BuildStrategyType {
   Custom = 'Custom',
   JenkinsPipeline = 'JenkinsPipeline',
   Source = 'Source',
+  Pac = 'Pac',
 }
 
 export const BuildLogLink = ({ build }) => {
@@ -333,6 +334,8 @@ export const getStrategyType = (strategy: BuildStrategyType) => {
       return 'jenkinsPipelineStrategy';
     case BuildStrategyType.Source:
       return 'sourceStrategy';
+    case BuildStrategyType.Pac:
+      return 'pacStrategy';
     default:
       return null;
   }
@@ -422,7 +425,7 @@ const BuildsTableRow: React.FC<RowFunctionArgs<K8sResourceKind>> = ({ obj }) => 
         <ResourceLink kind="Namespace" name={obj.metadata.namespace} />
       </TableData>
       <TableData className={tableColumnClasses[2]}>
-        <Status status={obj.status.phase} />
+        <Status status={obj.status?.phase} />
       </TableData>
       <TableData className={tableColumnClasses[3]}>
         <Timestamp timestamp={obj.metadata.creationTimestamp} />

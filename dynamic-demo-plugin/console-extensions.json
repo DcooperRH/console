@@ -202,6 +202,15 @@
     }
   },
   {
+    "type": "console.tab",
+    "properties": {
+      "contextId": "dev-console-observe",
+      "name": "Demo Logs",
+      "href": "/demo-logs",
+      "component": { "$codeRef": "exampleNavs.DynamicPage1" }
+    }
+  },
+  {
     "type": "console.page/route",
     "properties": {
       "path": "/test-utility-consumer",
@@ -320,6 +329,16 @@
     }
   },
   {
+    "type": "console.dashboards/custom/overview/detail/item",
+    "properties": {
+      "title": "%plugin__console-demo-plugin~Custom Overview Detail Title%",
+      "component": { "$codeRef": "customOverviewDetailItem.default" },
+      "error": { "$codeRef": "customOverviewDetailItem.getError" },
+      "isLoading": { "$codeRef": "customOverviewDetailItem.isLoading" },
+      "valueClassName": "co-select-to-copy"
+    }
+  },
+  {
     "type": "console.project-overview/inventory-item",
     "properties": {
       "component": { "$codeRef": "projectOverviewInventory.default" }
@@ -329,8 +348,62 @@
     "type": "console.project-overview/utilization-item",
     "properties": {
       "title": "%plugin__console-demo-plugin~Foo item%",
-      "getUtilizationQuery":  { "$codeRef": "projectOverview.getUtilizationQuery" },
-      "humanize": { "$codeRef": "clusterOverview.humanize"}
+      "getUtilizationQuery": { "$codeRef": "projectOverview.getUtilizationQuery" },
+      "humanize": { "$codeRef": "clusterOverview.humanize" }
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/test-modal",
+      "component": { "$codeRef": "modalPage.TestModalPage" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "test-modal-page",
+      "perspective": "admin",
+      "section": "admin-demo-section",
+      "name": "Modal Launchers",
+      "href": "/test-modal"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "path": "/sample-error-boundary-page",
+      "component": { "$codeRef": "sampleErrorBoundaryPage.default" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "error-boundary-page",
+      "perspective": "admin",
+      "section": "admin-demo-section",
+      "name": "%plugin__console-demo-plugin~Sample Error Boundary Page%",
+      "href": "/sample-error-boundary-page"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": false,
+      "path": ["/example-namespaced-page/ns/:ns", "/example-namespaced-page/all-namespaces"],
+      "component": {
+        "$codeRef": "exampleNamespacedPage.ExampleNamespacedPage"
+      }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "namespaced": true,
+      "id": "demo-example-namespaced-page",
+      "perspective": "demo",
+      "name": "%plugin__console-demo-plugin~Example Namespaced Page%",
+      "href": "/example-namespaced-page"
     }
   }
 ]

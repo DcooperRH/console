@@ -1,15 +1,16 @@
 import * as React from 'react';
 import { ButtonProps } from '@patternfly/react-core';
-import { TableGridBreakpoint, OnSelect, SortByDirection, ICell } from '@patternfly/react-table';
+import { ICell, OnSelect, SortByDirection, TableGridBreakpoint } from '@patternfly/react-table';
+import MonacoEditor from 'react-monaco-editor/lib/editor';
 import { RouteComponentProps } from 'react-router';
 import {
   ExtensionK8sGroupKindModel,
   K8sModel,
+  PrometheusEndpoint,
   PrometheusLabels,
   PrometheusValue,
   ResolvedExtension,
   Selector,
-  PrometheusEndpoint,
 } from '../api/common-types';
 import { Extension, ExtensionTypeGuard } from '../types';
 
@@ -437,6 +438,9 @@ export type ListPageFilterProps<D = any> = {
   data: D;
   loaded: boolean;
   rowFilters?: RowFilter[];
+  labelFilter?: string;
+  labelPath?: string;
+  nameFilterTitle?: string;
   nameFilterPlaceholder?: string;
   labelFilterPlaceholder?: string;
   hideNameLabelFilters?: boolean;
@@ -467,6 +471,7 @@ export type ResourceLinkProps = {
   dataTest?: string;
   onClick?: () => void;
   truncate?: boolean;
+  children?: React.ReactNode;
 };
 
 export type ResourceIconProps = {
@@ -623,8 +628,12 @@ export type YAMLEditorProps = {
   minHeight?: string | number;
   showShortcuts?: boolean;
   toolbarLinks?: React.ReactNodeArray;
-  onChange?: (newValue, event) => {};
-  onSave?: () => {};
+  onChange?: (newValue, event) => void;
+  onSave?: () => void;
+};
+
+export type YAMLEditorRef = {
+  editor?: MonacoEditor['editor'];
 };
 
 export type ResourceYAMLEditorProps = {
@@ -642,4 +651,17 @@ export type TimestampProps = {
   simple?: boolean;
   omitSuffix?: boolean;
   className?: string;
+};
+
+export type NamespaceBarProps = {
+  onNamespaceChange?: (namespace: string) => void;
+  isDisabled?: boolean;
+  children?: React.ReactNode;
+};
+
+export type ErrorBoundaryFallbackProps = {
+  errorMessage: string;
+  componentStack: string;
+  stack: string;
+  title: string;
 };

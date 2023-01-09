@@ -1,6 +1,8 @@
 /* eslint-disable */
 import * as React from 'react';
+import { ActionServiceProviderProps } from '../extensions/actions';
 import {
+  ErrorBoundaryFallbackProps,
   HorizontalNavProps,
   UseResolvedExtensions,
   VirtualizedTableFC,
@@ -25,6 +27,8 @@ import {
   ResourceEventStreamProps,
   UsePrometheusPoll,
   TimestampProps,
+  NamespaceBarProps,
+  YAMLEditorRef,
 } from '../extensions/console-types';
 import { StatusPopupSectionProps, StatusPopupItemProps } from '../extensions/dashboard-types';
 
@@ -351,7 +355,7 @@ export { default as ResourceStatus } from '../app/components/utils/resource-stat
  * @param {K8sResourceKindReference} [kind] - (optional) the kind of resource i.e. Pod, Deployment, Namespace
  * @param {K8sGroupVersionKind} [groupVersionKind] - (optional) object with group, version, and kind
  * @param {string} [className] -  (optional) class style for component
- * @example 
+ * @example
  * ```tsx
  * <ResourceIcon kind="Pod"/>
  * ```
@@ -572,8 +576,9 @@ export { useFlag } from '../utils/flags';
  * @param {YAMLEditorProps['toolbarLinks']} toolbarLinks - Array of ReactNode rendered on the toolbar links section on top of the editor.
  * @param {YAMLEditorProps['onChange']} onChange - Callback for on code change event.
  * @param {YAMLEditorProps['onSave']} onSave - Callback called when the command CTRL / CMD + S is triggered.
+ * @param {YAMLEditorRef} ref - React reference to `{ editor?: IStandaloneCodeEditor }`. Using the 'editor' property, you are able to access to all methods to control the editor. For more information, visit https://microsoft.github.io/monaco-editor/api/interfaces/monaco.editor.IStandaloneCodeEditor.html.
  */
-export const YAMLEditor: React.FC<YAMLEditorProps> = require('@console/internal/components/AsyncYAMLEditor')
+export const YAMLEditor: React.ForwardRefExoticComponent<YAMLEditorProps & React.RefAttributes<YAMLEditorRef>> = require('@console/internal/components/AsyncYAMLEditor')
   .AsyncYAMLEditor;
 
 /**
@@ -643,3 +648,76 @@ export const usePrometheusPoll: UsePrometheusPoll = (options) => {
  */
 export const Timestamp: React.FC<TimestampProps> = require('@console/internal/components/utils/timestamp')
   .Timestamp;
+
+export { useModal } from '../app/modal-support/useModal';
+
+/**
+ * Component that allows to receive contributions from other plugins for the `console.action/provider` extension type.
+ * See docs: https://github.com/openshift/console/blob/master/frontend/packages/console-dynamic-plugin-sdk/docs/console-extensions.md#consoleactionprovider
+ *
+ * @param {ActionServiceProviderProps["context"]} context - Object with contextId and optional plugin data
+ * @example
+ * ```tsx
+ *    const context: ActionContext = { 'a-context-id': { dataFromDynamicPlugin } };
+ *
+ *    ...
+ *
+ *    <ActionServiceProvider context={context}>
+ *        {({ actions, options, loaded }) =>
+ *          loaded && (
+ *            <ActionMenu actions={actions} options={options} variant={ActionMenuVariant.DROPDOWN} />
+ *          )
+ *        }
+ *    </ActionServiceProvider>
+ * ```
+ */
+export const ActionServiceProvider: React.FC<ActionServiceProviderProps> = require('@console/shared/src/components/actions/ActionServiceProvider')
+  .default;
+
+/**
+ * A component that renders a horizontal toolbar with a namespace dropdown menu in the leftmost position. Additional components can be passed in as children and will be rendered to the right of the namespace dropdown. This component is designed to be used at the top of the page. It should be used on pages where the user needs to be able to change the active namespace, such as on pages with k8s resources.
+ * @param {function} onNamespaceChange - (optional) A function that is executed when a namespace option is selected. It accepts the new namespace in the form of a string as its only argument. The active namespace is updated automatically when an option is selected, but additional logic can be applied via this function. When the namespace is changed, the namespace parameter in the URL will be changed from the previous namespace to the newly selected namespace.
+ * @param {boolean} isDisabled - (optional) A boolean flag that disables the namespace dropdown if set to true. This option only applies to the namespace dropdown and has no effect on child components.
+ * @param {React.ReactNode} children - (optional) Additional elements to be rendered inside the toolbar to the right of the namespace dropdown.
+ * @example
+ * ```tsx
+ *    const logNamespaceChange = (namespace) => console.log(`New namespace: ${namespace}`);
+ *
+ *    ...
+ *
+ *    <NamespaceBar onNamespaceChange={logNamespaceChange}>
+ *      <NamespaceBarApplicationSelector />
+ *    </NamespaceBar>
+ *    <Page>
+ *
+ *      ...
+ * ```
+ */
+export const NamespaceBar: React.FC<NamespaceBarProps> = require('@console/internal/components/namespace-bar')
+  .NamespaceBar;
+
+/**
+ * Creates full page ErrorBoundaryFallbackPage component to display the "Oh no! Something went wrong."
+ * message along with the stack trace and other helpful debugging information. This is to be used in
+ * conjunction with an <ErrorBoundary> component.
+ *
+ * @param {string} errorMessage - text description of the error message
+ * @param {string} componentStack - component trace of the exception
+ * @param {string} stack - stack trace of the exception
+ * @param {string} title - title to render as the header of the error boundary page
+ * @example
+ *  ```tsx
+ *  //in ErrorBoundary component
+ *   return (
+ *     if (this.state.hasError) {
+ *       return <ErrorBoundaryFallbackPage errorMessage={errorString} componentStack={componentStackString}
+ *        stack={stackTraceString} title={errorString}/>;
+ *     }
+ *
+ *     return this.props.children;
+ *   }
+ *  )
+ * ```
+ */
+export const ErrorBoundaryFallbackPage: React.FC<ErrorBoundaryFallbackProps> = require('@console/shared/src/components/error/fallbacks/ErrorBoundaryFallbackPage')
+  .default;

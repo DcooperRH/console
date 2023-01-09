@@ -16,7 +16,7 @@ When('user enters Git Repo URL as {string} in Import from Git form', (gitUrl: st
   devFilePage.verifyValidatedMessage(gitUrl);
 });
 
-When('user selects {string} radio button in Resource type section', (resourceType: string) => {
+When('user selects {string} in Resource type section', (resourceType: string) => {
   gitPage.selectResource(resourceType);
 });
 

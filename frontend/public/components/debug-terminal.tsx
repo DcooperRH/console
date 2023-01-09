@@ -19,6 +19,7 @@ const getDebugPod = (debugPodName: string, podToDebug: PodKind, containerName: s
   delete debugPod.metadata.uid;
   delete debugPod.metadata.managedFields;
   delete debugPod.metadata.name;
+  delete debugPod.metadata.ownerReferences;
   delete debugPod.metadata.labels;
   debugPod.metadata.generateName = debugPodName;
   debugPod.metadata.annotations['debug.openshift.io/source-container'] = containerName;
@@ -55,15 +56,13 @@ const DebugTerminalError: React.FC<DebugTerminalErrorProps> = ({ error, descript
 const DebugTerminalInner: React.FC<DebugTerminalInnerProps> = ({ debugPod, initialContainer }) => {
   const { t } = useTranslation();
   const infoMessage = (
-    <div className="co-terminal-info-message">
-      <Alert
-        variant="info"
-        isInline
-        title={t(
-          'public~This temporary pod has a modified entrypoint command to debug a failing container. The pod will be deleted when the terminal window is closed.',
-        )}
-      />
-    </div>
+    <Alert
+      variant="info"
+      isInline
+      title={t(
+        'public~This temporary pod has a modified entrypoint command to debug a failing container. The pod will be deleted when the terminal window is closed.',
+      )}
+    />
   );
   switch (debugPod?.status?.phase) {
     case 'Failed':

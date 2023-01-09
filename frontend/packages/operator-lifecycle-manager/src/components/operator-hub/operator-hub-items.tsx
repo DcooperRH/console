@@ -22,6 +22,8 @@ import {
   GreenCheckCircleIcon,
   Modal,
   useUserSettingsCompatibility,
+  useActiveCluster,
+  HUB_CLUSTER_NAME,
 } from '@console/shared';
 import { getURLWithParams } from '@console/shared/src/components/catalog/utils';
 import { isModifiedEvent } from '@console/shared/src/utils';
@@ -40,14 +42,15 @@ import {
 const osBaseLabel = 'operatorframework.io/os.';
 const targetGOOSLabel = window.SERVER_FLAGS.GOOS ? `${osBaseLabel}${window.SERVER_FLAGS.GOOS}` : '';
 const archBaseLabel = 'operatorframework.io/arch.';
-const targetGOARCHLabel = window.SERVER_FLAGS.GOARCH
-  ? `${archBaseLabel}${window.SERVER_FLAGS.GOARCH}`
-  : '';
+const targetNodeArchitectures = window.SERVER_FLAGS.nodeArchitectures ?? [];
+const targetNodeArchitecturesLabels = targetNodeArchitectures.map(
+  (arch) => `${archBaseLabel}${arch}`,
+);
 // if no label present, these are the assumed defaults
 const archDefaultAMD64Label = 'operatorframework.io/arch.amd64';
 const osDefaultLinuxLabel = 'operatorframework.io/os.linux';
 const filterByArchAndOS = (items: OperatorHubItem[]): OperatorHubItem[] => {
-  if (!window.SERVER_FLAGS.GOARCH || !window.SERVER_FLAGS.GOOS) {
+  if (_.isEmpty(targetNodeArchitectures) || !window.SERVER_FLAGS.GOOS) {
     return items;
   }
   return items.filter((item: OperatorHubItem) => {
@@ -80,7 +83,7 @@ const filterByArchAndOS = (items: OperatorHubItem[]): OperatorHubItem[] => {
 
     return (
       _.includes(relevantLabels.os, targetGOOSLabel) &&
-      _.includes(relevantLabels.arch, targetGOARCHLabel)
+      _.some(relevantLabels.arch, (arch) => _.includes(targetNodeArchitecturesLabels, arch))
     );
   });
 };
@@ -393,13 +396,14 @@ const OperatorHubTile: React.FC<OperatorHubTileProps> = ({ item, onClick }) => {
 
 export const OperatorHubTileView: React.FC<OperatorHubTileViewProps> = (props) => {
   const { t } = useTranslation();
+  const [activeCluster] = useActiveCluster();
   const [detailsItem, setDetailsItem] = React.useState(null);
   const [showDetails, setShowDetails] = React.useState(false);
   const [ignoreOperatorWarning, setIgnoreOperatorWarning, loaded] = useUserSettingsCompatibility<
     boolean
   >(userSettingsKey, storeKey, false);
-
-  const filteredItems = filterByArchAndOS(props.items);
+  const filteredItems =
+    activeCluster === HUB_CLUSTER_NAME ? filterByArchAndOS(props.items) : props.items;
 
   React.useEffect(() => {
     const detailsItemID = new URLSearchParams(window.location.search).get('details-item');
@@ -582,7 +586,7 @@ export const OperatorHubTileView: React.FC<OperatorHubTileViewProps> = (props) =
           onClose={closeOverlay}
           title={detailsItem.name}
         >
-          <OperatorHubItemDetails namespace={props.namespace} item={detailsItem} />
+          <OperatorHubItemDetails item={detailsItem} />
         </Modal>
       )}
     </>

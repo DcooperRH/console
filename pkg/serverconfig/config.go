@@ -213,6 +213,14 @@ func addClusterInfo(fs *flag.FlagSet, clusterInfo *ClusterInfo) {
 	if clusterInfo.ReleaseVersion != "" {
 		fs.Set("release-version", string(clusterInfo.ReleaseVersion))
 	}
+
+	if len(clusterInfo.NodeArchitectures) > 0 {
+		fs.Set("node-architectures", strings.Join(clusterInfo.NodeArchitectures, ","))
+	}
+
+	if clusterInfo.CopiedCSVsDisabled {
+		fs.Set("copied-csvs-disabled", "true")
+	}
 }
 
 func addAuth(fs *flag.FlagSet, auth *Auth) {
@@ -265,6 +273,12 @@ func addMonitoringInfo(fs *flag.FlagSet, monitoring *MonitoringInfo) {
 	if monitoring.ThanosPublicURL != "" {
 		fs.Set("thanos-public-url", monitoring.ThanosPublicURL)
 	}
+	if monitoring.AlertmanagerUserWorkloadHost != "" {
+		fs.Set("alermanager-user-workload-host", monitoring.AlertmanagerUserWorkloadHost)
+	}
+	if monitoring.AlertmanagerTenancyHost != "" {
+		fs.Set("alermanager-tenancy-host", monitoring.AlertmanagerTenancyHost)
+	}
 }
 
 func addCustomization(fs *flag.FlagSet, customization *Customization) {
@@ -293,6 +307,15 @@ func addCustomization(fs *flag.FlagSet, customization *Customization) {
 		}
 	}
 
+	if (customization.DeveloperCatalog.Types != DeveloperConsoleCatalogTypesState{}) {
+		types, err := json.Marshal(customization.DeveloperCatalog.Types)
+		if err == nil {
+			fs.Set("developer-catalog-types", string(types))
+		} else {
+			klog.Fatalf("Could not marshal ConsoleConfig customization.developerCatalog.types field: %v", err)
+		}
+	}
+
 	if customization.QuickStarts.Disabled != nil {
 		quickStarts, err := json.Marshal(customization.QuickStarts)
 		if err == nil {
@@ -315,6 +338,15 @@ func addCustomization(fs *flag.FlagSet, customization *Customization) {
 			klog.Fatalf("Could not marshal ConsoleConfig customization.projectAccess field: %v", err)
 		} else {
 			fs.Set("project-access-cluster-roles", string(projectAccessClusterRoles))
+		}
+	}
+
+	if customization.Perspectives != nil {
+		perspectives, err := json.Marshal(customization.Perspectives)
+		if err != nil {
+			klog.Fatalf("Could not marshal ConsoleConfig customization.perspectives field: %v", err)
+		} else {
+			fs.Set("perspectives", string(perspectives))
 		}
 	}
 }

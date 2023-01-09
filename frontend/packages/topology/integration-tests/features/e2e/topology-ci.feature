@@ -1,6 +1,6 @@
 @topology @smoke
 Feature: Perform actions on topology
-        User will be able to create workloads and perform actions on topology page
+    User will be able to create workloads and perform actions on topology page
 
 
         @pre-condition
@@ -25,6 +25,7 @@ Feature: Perform actions on topology
               And user enters Git Repo URL as "https://github.com/redhat-developer/s2i-dotnetcore-ex" in Create Source-to-Image Application
               And user enters Application Name as "dotnet-app"
               And user enters Name as "dotnet"
+              And user selects "Deployment" in Resource type section
               And user clicks Create button on Create Source-to-Image Application page
              Then user is able to see workload "dotnet" in topology page
 

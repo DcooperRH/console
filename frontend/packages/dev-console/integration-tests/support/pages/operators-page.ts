@@ -181,6 +181,21 @@ export const operatorsPage = {
         cy.get(operatorsPO.operatorHub.redisOperatorCard).click();
         break;
       }
+      case 'AMQ Streams':
+      case operators.AMQStreams: {
+        cy.get(operatorsPO.operatorHub.amqStreams).click();
+        break;
+      }
+      case 'RHOAS':
+      case operators.RHOAS: {
+        cy.get(operatorsPO.operatorHub.rhoas).click();
+        break;
+      }
+      case 'Jaeger':
+      case operators.Jaeger: {
+        cy.get(operatorsPO.operatorHub.jaeger).click();
+        break;
+      }
       default: {
         throw new Error('operator is not available');
       }

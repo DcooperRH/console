@@ -1,3 +1,4 @@
+import { formatPrometheusDuration } from '@openshift-console/plugin-shared/src/datetime/prometheus';
 import i18next from 'i18next';
 import * as _ from 'lodash';
 import { errorModal } from '@console/internal/components/modals/error-modal';
@@ -7,7 +8,6 @@ import {
   LOG_SOURCE_RUNNING,
   LOG_SOURCE_TERMINATED,
 } from '@console/internal/components/utils';
-import { formatPrometheusDuration } from '@console/internal/components/utils/datetime';
 import { ServiceAccountModel } from '@console/internal/models';
 import {
   ContainerStatus,
@@ -145,11 +145,11 @@ export const appendPipelineRunStatus = (pipeline, pipelineRun, isFinallyTasks = 
     }
     // append task status
     if (!mTask.status) {
-      mTask.status = { reason: ComputedStatus.Idle };
+      mTask.status = { reason: ComputedStatus.Pending };
     } else if (mTask.status && mTask.status.conditions) {
-      mTask.status.reason = pipelineRunStatus(mTask) || ComputedStatus.Idle;
+      mTask.status.reason = pipelineRunStatus(mTask) || ComputedStatus.Pending;
     } else if (mTask.status && !mTask.status.reason) {
-      mTask.status.reason = ComputedStatus.Idle;
+      mTask.status.reason = ComputedStatus.Pending;
     }
     return mTask;
   });
@@ -276,7 +276,7 @@ export const getLatestPipelineRunStatus = (
     return { latestPipelineRun: null, status: ComputedStatus.PipelineNotStarted };
   }
 
-  const latestPipelineRun = getLatestRun({ data: pipelineRuns }, 'creationTimestamp');
+  const latestPipelineRun = getLatestRun(pipelineRuns, 'creationTimestamp');
 
   if (!latestPipelineRun) {
     // Without the latestRun we will not have progress to show

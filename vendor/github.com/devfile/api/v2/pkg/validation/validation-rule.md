@@ -14,8 +14,8 @@ The validation will be done as part of schema validation, the rule will be intro
 
 ### Endpoints:
 - all the endpoint names are unique across components
-  
-Since network is shared in the same pod, endpoint ports should be unique across components, two components cannot have the same target port but two endpoints in a single component can have the same target port. Only exception: container component with `dedicatedpod=true`
+- endpoint ports must be unique across components -- two components cannot have the same target port, but one component may have two endpoints with the same target port. This restriction does not apply to container components with `dedicatedPod` set to `true`.
+
 
 ### Commands:
 1. id must be unique

@@ -1,39 +1,10 @@
-import { APIError } from '@console/shared';
 import {
-  Silence,
-  PrometheusAlert,
   Alert,
-  PrometheusRule,
   PrometheusLabels,
-  PrometheusValue,
-  Rule,
-  RuleStates,
-  AlertStates,
-  AlertSeverity,
-  SilenceStates,
-} from '@console/dynamic-plugin-sdk/src/api/common-types';
-
-import { RowFunctionArgs } from '../factory';
-import { RowFilter } from '../filter-toolbar';
-
-export {
-  SilenceStates,
-  AlertSeverity,
-  RuleStates,
-  AlertStates,
-};
-
-// prettier 1.x doesn't support TS 3.8 syntax
-// eslint-disable-next-line prettier/prettier
-export type {
-  PrometheusAlert,
-  Alert,
   PrometheusRule,
-  PrometheusLabels,
-  PrometheusValue,
   Rule,
   Silence,
-}
+} from '@console/dynamic-plugin-sdk';
 
 export const enum AlertSource {
   Platform = 'platform',
@@ -72,38 +43,20 @@ type Group = {
 };
 
 export type PrometheusAPIError = {
-  response?: {
-    status: number;
-  };
-  json?: {
+  json: {
     error?: string;
   };
-} & APIError;
+  message?: string;
+  response: {
+    status: number;
+  };
+};
 
 export type PrometheusRulesResponse = {
   data: {
     groups: Group[];
   };
   status: string;
-};
-
-export type ListPageProps = {
-  CreateButton?: React.ComponentType<{}>;
-  data: Alert[] | Rule[] | Silence[];
-  defaultSortField: string;
-  Header: (...args) => any[];
-  hideLabelFilter?: boolean;
-  kindPlural: string;
-  labelFilter?: string;
-  labelPath?: string;
-  loaded: boolean;
-  loadError?: any;
-  nameFilterID: string;
-  reduxID: string;
-  Row: React.FC<RowFunctionArgs>;
-  rowFilters: RowFilter[];
-  showTitle?: boolean;
-  TopAlert?: React.ReactNode
 };
 
 export type Target = {

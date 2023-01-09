@@ -24,20 +24,9 @@ export const verifyMultipleWorkloadInTopologyPage = (workloadNames: string[]) =>
 export const createWorkloadUsingOptions = (optionName: string, optionalData?: string) => {
   switch (optionName) {
     case 'Go Sample':
-      gitPage.verifyValidatedMessage(
-        'https://github.com/devfile-samples/devfile-sample-go-basic.git',
-      );
-      gitPage.enterComponentName('go-basic');
-      gitPage.selectResource('Deployment');
-      cy.get(chartAreaPO.gitInputURL).should('be.disabled');
-      cy.get(chartAreaPO.gitForm)
-        .contains('Show advanced Routing options')
+      cy.get(chartAreaPO.submitButton)
+        .should('be.enabled')
         .click();
-      cy.get(chartAreaPO.gitForm)
-        .contains('Hide advanced Routing options')
-        .click();
-      gitPage.enterComponentName('go-basic');
-      cy.get(chartAreaPO.submitButton).click();
       break;
 
     case 'Import From Git':
@@ -79,7 +68,7 @@ export const createWorkloadUsingOptions = (optionName: string, optionalData?: st
       const yamlLocation = `support/${optionalData}`;
       yamlEditor.setEditorContent(yamlLocation);
       cy.get(chartAreaPO.saveChanges).click();
-      cy.get('[aria-label="Breadcrumb"]').should('contain', 'PostgresCluster details');
+      cy.get('[aria-label="Breadcrumb"]').should('contain', 'Redis details');
       navigateTo(devNavigationMenu.Topology);
       break;
 

@@ -1,9 +1,14 @@
 import * as React from 'react';
 import { GraphElement, Graph, Node, Edge, isEdge, isGraph } from '@patternfly/react-topology';
-import { getCommonResourceActions } from '@console/app/src/actions/creators/common-factory';
+import {
+  CommonActionFactory,
+  getCommonResourceActions,
+} from '@console/app/src/actions/creators/common-factory';
 import { DeploymentActionFactory } from '@console/app/src/actions/creators/deployment-factory';
 import { getHealthChecksAction } from '@console/app/src/actions/creators/health-checks-factory';
 import { disabledActionsFilter } from '@console/dev-console/src/actions/add-resources';
+import { DeleteResourceAction } from '@console/dev-console/src/actions/context-menu';
+import { getDisabledAddActions } from '@console/dev-console/src/utils/useAddActionExtensions';
 import { Action } from '@console/dynamic-plugin-sdk';
 import {
   K8sResourceKind,
@@ -11,11 +16,20 @@ import {
   referenceForModel,
   modelFor,
 } from '@console/internal/module/k8s';
-import { useActiveNamespace } from '@console/shared';
+import { isCatalogTypeEnabled, useActiveNamespace } from '@console/shared';
 import { useK8sModel } from '@console/shared/src/hooks/useK8sModel';
 import { MoveConnectorAction } from '@console/topology/src/actions/edgeActions';
 import { getModifyApplicationAction } from '@console/topology/src/actions/modify-application';
 import { TYPE_APPLICATION_GROUP } from '@console/topology/src/const';
+import { useKnativeEventingEnabled } from '../catalog/useEventSourceProvider';
+import {
+  EVENTING_BROKER_ACTION_ID,
+  EVENTING_CHANNEL_ACTION_ID,
+  EVENT_SINK_ACTION_ID,
+  EVENT_SINK_CATALOG_TYPE_ID,
+  EVENT_SOURCE_ACTION_ID,
+  EVENT_SOURCE_CATALOG_TYPE_ID,
+} from '../const';
 import { RevisionModel, EventingBrokerModel, ServiceModel } from '../models';
 import {
   TYPE_EVENT_SOURCE,
@@ -79,7 +93,12 @@ export const useKnativeServiceActionsProvider = (resource: K8sResourceKind) => {
       getHealthChecksAction(kindObj, resource),
       editKnativeService(kindObj, resource),
       DeploymentActionFactory.EditResourceLimits(kindObj, resource),
-      ...getCommonResourceActions(kindObj, resource),
+      CommonActionFactory.ModifyLabels(kindObj, resource),
+      CommonActionFactory.ModifyAnnotations(kindObj, resource),
+      CommonActionFactory.Edit(kindObj, resource),
+      ...(resource.metadata.annotations?.['openshift.io/generated-by'] === 'OpenShiftWebConsole'
+        ? [DeleteResourceAction(kindObj, resource, true)]
+        : [CommonActionFactory.Delete(kindObj, resource)]),
     ];
   }, [kindObj, resource]);
 
@@ -88,14 +107,19 @@ export const useKnativeServiceActionsProvider = (resource: K8sResourceKind) => {
 
 export const useBrokerActionProvider = (resource: K8sResourceKind) => {
   const [kindObj, inFlight] = useK8sModel(referenceFor(resource));
+  const isEventSinkTypeEnabled = isCatalogTypeEnabled(EVENT_SINK_CATALOG_TYPE_ID);
+  const addActions: Action[] = [];
   const actions = React.useMemo(() => {
     const connectorSource = `${referenceFor(resource)}/${resource.metadata.name}`;
-    return [
-      addTriggerBroker(kindObj, resource),
-      AddEventSinkMenuAction(resource.metadata.namespace, undefined, connectorSource),
-      ...getCommonResourceActions(kindObj, resource),
-    ];
-  }, [kindObj, resource]);
+    addActions.push(addTriggerBroker(kindObj, resource));
+    if (isEventSinkTypeEnabled) {
+      addActions.push(
+        AddEventSinkMenuAction(resource.metadata.namespace, undefined, connectorSource),
+      );
+    }
+    addActions.push(...getCommonResourceActions(kindObj, resource));
+    return addActions;
+  }, [addActions, isEventSinkTypeEnabled, kindObj, resource]);
 
   return [actions, !inFlight, undefined];
 };
@@ -119,16 +143,31 @@ export const useCommonActionsProvider = (resource: K8sResourceKind) => {
 
 export const useChannelActionProvider = (resource: K8sResourceKind) => {
   const [kindObj, inFlight] = useK8sModel(referenceFor(resource));
+  const isEventSinkTypeEnabled = isCatalogTypeEnabled(EVENT_SINK_CATALOG_TYPE_ID);
+  const addActions: Action[] = [];
   const actions = React.useMemo(() => {
     const connectorSource = `${referenceFor(resource)}/${resource.metadata.name}`;
-    return [
-      addSubscriptionChannel(kindObj, resource),
-      AddEventSinkMenuAction(resource.metadata.namespace, undefined, connectorSource),
-      ...getCommonResourceActions(kindObj, resource),
-    ];
-  }, [kindObj, resource]);
+    addActions.push(addSubscriptionChannel(kindObj, resource));
+    if (isEventSinkTypeEnabled) {
+      addActions.push(
+        AddEventSinkMenuAction(resource.metadata.namespace, undefined, connectorSource),
+      );
+    }
+    addActions.push(...getCommonResourceActions(kindObj, resource));
+    return addActions;
+  }, [addActions, isEventSinkTypeEnabled, kindObj, resource]);
 
   return [actions, !inFlight, undefined];
+};
+
+const getEventingEnabledAddAction = () => {
+  const disabledAddActions = getDisabledAddActions();
+  return {
+    isEventSourceAddEnabled: !disabledAddActions?.includes(EVENT_SOURCE_ACTION_ID),
+    isEventSinkAddEnabled: !disabledAddActions?.includes(EVENT_SINK_ACTION_ID),
+    isChannelAddEnabled: !disabledAddActions?.includes(EVENTING_CHANNEL_ACTION_ID),
+    isBrokerAddEnabled: !disabledAddActions?.includes(EVENTING_BROKER_ACTION_ID),
+  };
 };
 
 export const useTopologyActionsProvider = ({
@@ -138,6 +177,16 @@ export const useTopologyActionsProvider = ({
   element: GraphElement;
   connectorSource?: Node;
 }) => {
+  const isEventSinkTypeEnabled = isCatalogTypeEnabled(EVENT_SINK_CATALOG_TYPE_ID);
+  const isEventSourceTypeEnabled = isCatalogTypeEnabled(EVENT_SOURCE_CATALOG_TYPE_ID);
+  const isEventingEnabled = useKnativeEventingEnabled();
+  const {
+    isEventSourceAddEnabled,
+    isEventSinkAddEnabled,
+    isChannelAddEnabled,
+    isBrokerAddEnabled,
+  } = getEventingEnabledAddAction();
+
   const [namespace] = useActiveNamespace();
   const actions = React.useMemo(() => {
     const application = element.getLabel();
@@ -146,12 +195,20 @@ export const useTopologyActionsProvider = ({
         return [];
       }
       const path = application ? 'add-to-application' : 'add-to-project';
-      return [
-        AddEventSinkAction(namespace, application, undefined, path),
-        AddEventSourceAction(namespace, application, undefined, path),
-        AddChannelAction(namespace, application, path),
-        AddBrokerAction(namespace, application, path),
-      ].filter(disabledActionsFilter);
+      const addActions: Action[] = [];
+      if (isEventSinkAddEnabled && isEventSinkTypeEnabled && isEventingEnabled) {
+        addActions.push(AddEventSinkAction(namespace, application, undefined, path));
+      }
+      if (isEventSourceAddEnabled && isEventSourceTypeEnabled && isEventingEnabled) {
+        addActions.push(AddEventSourceAction(namespace, application, undefined, path));
+      }
+      if (isEventingEnabled && isChannelAddEnabled) {
+        addActions.push(AddChannelAction(namespace, application, path));
+      }
+      if (isEventingEnabled && isBrokerAddEnabled) {
+        addActions.push(AddBrokerAction(namespace, application, path));
+      }
+      return addActions.filter(disabledActionsFilter);
     }
 
     if (connectorSource.getData().type === TYPE_EVENT_SOURCE_KAFKA) return [];
@@ -159,38 +216,60 @@ export const useTopologyActionsProvider = ({
     const sourceKind = connectorSource.getData().data.kind;
     const connectorResource = connectorSource.getData().resource;
     if (isEventingChannelResourceKind(sourceKind)) {
-      return [
-        AddSubscriptionAction(connectorResource),
-        AddEventSinkMenuAction(
-          namespace,
-          application,
-          `${sourceKind}/${connectorResource.metadata.name}`,
-        ),
-      ];
-    }
-    switch (sourceKind) {
-      case referenceForModel(ServiceModel):
-        return [
-          AddEventSourceAction(
-            namespace,
-            application,
-            `${sourceKind}/${connectorResource.metadata.name}`,
-            '',
-          ),
-        ].filter(disabledActionsFilter);
-      case referenceForModel(EventingBrokerModel):
-        return [
-          AddTriggerAction(connectorResource),
+      const addActions: Action[] = [];
+      addActions.push(AddSubscriptionAction(connectorResource));
+      if (isEventSinkTypeEnabled) {
+        addActions.push(
           AddEventSinkMenuAction(
             namespace,
             application,
             `${sourceKind}/${connectorResource.metadata.name}`,
           ),
-        ];
+        );
+      }
+      return addActions;
+    }
+    switch (sourceKind) {
+      case referenceForModel(ServiceModel):
+        return isEventSourceTypeEnabled
+          ? [
+              AddEventSourceAction(
+                namespace,
+                application,
+                `${sourceKind}/${connectorResource.metadata.name}`,
+                '',
+              ),
+            ].filter(disabledActionsFilter)
+          : [];
+      case referenceForModel(EventingBrokerModel): {
+        const addActions: Action[] = [];
+        addActions.push(AddTriggerAction(connectorResource));
+        if (isEventSinkTypeEnabled) {
+          addActions.push(
+            AddEventSinkMenuAction(
+              namespace,
+              application,
+              `${sourceKind}/${connectorResource.metadata.name}`,
+            ),
+          );
+        }
+        return addActions;
+      }
       default:
         return [];
     }
-  }, [connectorSource, element, namespace]);
+  }, [
+    connectorSource,
+    element,
+    isBrokerAddEnabled,
+    isChannelAddEnabled,
+    isEventSinkAddEnabled,
+    isEventSinkTypeEnabled,
+    isEventSourceAddEnabled,
+    isEventSourceTypeEnabled,
+    isEventingEnabled,
+    namespace,
+  ]);
   return [actions, true, undefined];
 };
 

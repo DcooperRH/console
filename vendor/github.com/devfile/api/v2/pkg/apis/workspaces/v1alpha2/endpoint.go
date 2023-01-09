@@ -50,6 +50,8 @@ type Endpoint struct {
 	// +kubebuilder:validation:MaxLength=63
 	Name string `json:"name"`
 
+	// Port number to be used within the container component. The same port cannot
+	// be used by two different container components.
 	TargetPort int `json:"targetPort"`
 
 	// Describes how the endpoint should be exposed on the network.

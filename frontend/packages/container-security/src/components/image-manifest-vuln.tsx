@@ -7,6 +7,7 @@ import { TFunction } from 'i18next';
 import * as _ from 'lodash';
 import { useTranslation } from 'react-i18next';
 import { match } from 'react-router';
+import { DASH } from '@console/dynamic-plugin-sdk/src/app/constants';
 import { DefaultList } from '@console/internal/components/default-resource';
 import {
   MultiListPage,
@@ -39,22 +40,22 @@ import { quayURLFor } from './summary';
 import './image-manifest-vuln.scss';
 
 const shortenImage = (img: string) =>
-  img
+  (img ?? '')
     .replace('@sha256', '')
     .split('/')
     .slice(1, 3)
     .join('/');
-const shortenHash = (hash: string) => hash.slice(7, 18);
+const shortenHash = (hash: string): string => (hash ?? '').slice(7, 18);
 export const totalCount = (obj: ImageManifestVuln) => {
   if (!obj.status) return 0;
   const { highCount = 0, mediumCount = 0, lowCount = 0, unknownCount = 0 } = obj.status;
   return highCount + mediumCount + lowCount + unknownCount;
 };
 export const affectedPodsCount = (obj: ImageManifestVuln) =>
-  Object.keys(obj.status.affectedPods).length;
+  Object.keys(obj.status?.affectedPods ?? {}).length;
 
 export const highestSeverityIndex = (obj: ImageManifestVuln) =>
-  priorityFor(obj.status.highestSeverity).index;
+  priorityFor(obj.status?.highestSeverity).index;
 
 export const ImageManifestVulnDetails: React.FC<ImageManifestVulnDetailsProps> = (props) => {
   const { t } = useTranslation();
@@ -100,7 +101,7 @@ export const ImageManifestVulnDetails: React.FC<ImageManifestVulnDetailsProps> =
 export const AffectedPods: React.FC<AffectedPodsProps> = (props) => {
   const affectedPodsFor = (pods: PodKind[]) =>
     pods.filter((p) =>
-      _.keys(props.obj.status.affectedPods).includes(
+      _.keys(props.obj.status?.affectedPods ?? {}).includes(
         [p.metadata.namespace, p.metadata.name].join('/'),
       ),
     );
@@ -126,9 +127,11 @@ export const ImageManifestVulnDetailsPage: React.FC<ImageManifestVulnDetailsPage
     <DetailsPage
       match={props.match}
       kindObj={ImageManifestVulnModel}
-      titleFunc={(obj: ImageManifestVuln) =>
-        !_.isEmpty(obj) ? `${shortenImage(obj.spec.image)}@${shortenHash(obj.spec.manifest)}` : null
-      }
+      titleFunc={(obj: ImageManifestVuln) => {
+        const image = shortenImage(obj?.spec?.image);
+        const hash = obj?.spec?.manifest ? `@${shortenHash(obj.spec.manifest)}` : '';
+        return image ? `${image}${hash}` : null;
+      }}
       name={props.match.params.name}
       namespace={props.match.params.ns}
       kind={referenceForModel(ImageManifestVulnModel)}
@@ -174,17 +177,17 @@ export const ImageManifestVulnTableRow: React.FC<RowFunctionArgs<ImageManifestVu
         <ResourceLink kind="Namespace" name={namespace} />
       </TableData>
       <TableData className={tableColumnClasses[2]}>
-        {_.get(obj.status, 'highestSeverity') ? (
+        {obj.status?.highestSeverity ? (
           <>
             <ExclamationTriangleIcon color={priorityFor(obj.status.highestSeverity).color.value} />
             &nbsp;{obj.status.highestSeverity}
           </>
         ) : (
-          <Loading />
+          DASH
         )}
       </TableData>
       <TableData className={tableColumnClasses[3]}>{affectedPodsCount(obj)}</TableData>
-      <TableData className={tableColumnClasses[4]}>{obj.status.fixableCount || 0}</TableData>
+      <TableData className={tableColumnClasses[4]}>{obj.status?.fixableCount || 0}</TableData>
       <TableData className={tableColumnClasses[5]}>{totalCount(obj)}</TableData>
       <TableData className={tableColumnClasses[6]}>
         <ExternalLink text={shortenHash(obj.spec.manifest)} href={quayURLFor(obj)} />

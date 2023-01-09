@@ -1,6 +1,17 @@
-import * as classNames from 'classnames';
-import * as React from 'react';
+import classNames from 'classnames';
 import * as _ from 'lodash-es';
+import * as React from 'react';
+import {
+  PrometheusEndpoint,
+  PrometheusLabels,
+  PrometheusResponse,
+  PrometheusResult,
+  PrometheusValue,
+} from '@console/dynamic-plugin-sdk';
+import {
+  formatPrometheusDuration,
+  parsePrometheusDuration,
+} from '@openshift-console/plugin-shared/src/datetime/prometheus';
 import {
   Chart,
   ChartArea,
@@ -9,19 +20,21 @@ import {
   ChartLegend,
   ChartLine,
   ChartStack,
-  ChartThemeColor,
-  ChartThemeVariant,
   ChartVoronoiContainer,
-  getCustomTheme,
 } from '@patternfly/react-charts';
 import {
   Alert,
   Button,
   Checkbox,
+  Dropdown,
+  DropdownItem,
+  DropdownPosition,
+  DropdownToggle,
   EmptyState,
   EmptyStateBody,
   EmptyStateIcon,
   EmptyStateVariant,
+  InputGroup,
   TextInput,
   Title,
 } from '@patternfly/react-core';
@@ -32,7 +45,6 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { VictoryPortal } from 'victory-core';
 
-import { PrometheusEndpoint } from '@console/dynamic-plugin-sdk/src/api/common-types';
 import withFallback from '@console/shared/src/components/error/fallbacks/withFallback';
 
 import {
@@ -41,38 +53,22 @@ import {
   queryBrowserSetTimespan,
 } from '../../actions/observe';
 import { RootState } from '../../redux';
-import { PrometheusLabels, PrometheusResponse, PrometheusResult, PrometheusValue } from '../graphs';
 import { GraphEmpty } from '../graphs/graph-empty';
 import { getPrometheusURL } from '../graphs/helpers';
-import { queryBrowserTheme } from '../graphs/themes';
-import {
-  Dropdown,
-  humanizeNumberSI,
-  LoadingInline,
-  usePoll,
-  useRefWidth,
-  useSafeFetch,
-} from '../utils';
+import { humanizeNumberSI, LoadingInline, usePoll, useRefWidth, useSafeFetch } from '../utils';
 import {
   dateFormatterNoYear,
   dateTimeFormatterWithSeconds,
-  formatPrometheusDuration,
-  parsePrometheusDuration,
   timeFormatter,
   timeFormatterWithSeconds,
 } from '../utils/datetime';
 import { formatNumber } from './format';
+import { useBoolean } from './hooks/useBoolean';
+import { queryBrowserTheme } from './query-browser-theme';
 import { PrometheusAPIError } from './types';
-import { ONE_MINUTE } from '@console/shared/src/constants/time';
 
 const spans = ['5m', '15m', '30m', '1h', '2h', '6h', '12h', '1d', '2d', '1w', '2w'];
-const dropdownItems = _.zipObject(spans, spans);
-const theme = getCustomTheme(
-  ChartThemeColor.multiUnordered,
-  ChartThemeVariant.light,
-  queryBrowserTheme,
-);
-export const colors = theme.line.colorScale;
+export const colors = queryBrowserTheme.line.colorScale;
 
 // Use exponential notation for small or very large numbers to avoid labels with too many characters
 const formatPositiveValue = (v: number): string =>
@@ -110,6 +106,8 @@ const SpanControls: React.FC<SpanControlsProps> = React.memo(
 
     const { t } = useTranslation();
 
+    const [isOpen, setIsOpen, , setClosed] = useBoolean(false);
+
     React.useEffect(() => {
       setText(formatPrometheusDuration(span));
     }, [span]);
@@ -127,24 +125,35 @@ const SpanControls: React.FC<SpanControlsProps> = React.memo(
       }
     };
 
+    const dropdownItems = spans.map((s) => (
+      <DropdownItem
+        className="query-browser__span-dropdown-item"
+        key={s}
+        onClick={() => setSpan(s, true)}
+      >
+        {s}
+      </DropdownItem>
+    ));
+
     return (
       <>
-        <TextInput
-          aria-label={t('public~graph timespan')}
-          className="query-browser__span-text"
-          validated={isValid ? 'default' : 'error'}
-          onChange={(v) => setSpan(v, true)}
-          type="text"
-          value={text}
-        />
-        <Dropdown
-          ariaLabel={t('public~graph timespan')}
-          buttonClassName="dropdown-button--icon-only"
-          items={dropdownItems}
-          menuClassName="query-browser__span-dropdown-menu"
-          noSelection={true}
-          onChange={(v: string) => setSpan(v)}
-        />
+        <InputGroup className="query-browser__span">
+          <TextInput
+            aria-label={t('public~graph timespan')}
+            className="query-browser__span-text"
+            validated={isValid ? 'default' : 'error'}
+            onChange={(v) => setSpan(v, true)}
+            type="text"
+            value={text}
+          />
+          <Dropdown
+            dropdownItems={dropdownItems}
+            isOpen={isOpen}
+            onSelect={setClosed}
+            position={DropdownPosition.right}
+            toggle={<DropdownToggle aria-label={t('public~graph timespan')} onToggle={setIsOpen} />}
+          />
+        </InputGroup>
         <Button
           className="query-browser__inline-control"
           onClick={() => setSpan(defaultSpanText)}
@@ -321,6 +330,8 @@ type GraphSeries = GraphDataPoint[] | null;
 
 const getXDomain = (endTime: number, span: number): AxisDomain => [endTime - span, endTime];
 
+const ONE_MINUTE = 60 * 1000;
+
 const Graph: React.FC<GraphProps> = React.memo(
   ({
     allSeries,
@@ -362,7 +373,7 @@ const Graph: React.FC<GraphProps> = React.memo(
       });
     });
 
-    if (data.every(_.isEmpty)) {
+    if (!data.some(Array.isArray)) {
       return <GraphEmpty />;
     }
 
@@ -374,16 +385,16 @@ const Graph: React.FC<GraphProps> = React.memo(
         _.every(series, ([, values]) => _.every(values, { y: 0 })),
       );
       if (isAllZero) {
-        domain.y = [-1, 1];
+        domain.y = [0, 1];
       }
     } else {
       // Set a reasonable Y-axis range based on the min and max values in the data
-      const findMin = (series: GraphSeries) => _.minBy(series, 'y');
-      const findMax = (series: GraphSeries) => _.maxBy(series, 'y');
+      const findMin = (series: GraphSeries): GraphDataPoint => _.minBy(series, 'y');
+      const findMax = (series: GraphSeries): GraphDataPoint => _.maxBy(series, 'y');
       let minY: number = findMin(data.map(findMin))?.y ?? 0;
       let maxY: number = findMax(data.map(findMax))?.y ?? 0;
       if (minY === 0 && maxY === 0) {
-        minY = -1;
+        minY = 0;
         maxY = 1;
       } else if (minY > 0 && maxY > 0) {
         minY = 0;
@@ -422,7 +433,7 @@ const Graph: React.FC<GraphProps> = React.memo(
         domainPadding={{ y: 1 }}
         height={200}
         scale={{ x: 'time', y: 'linear' }}
-        theme={theme}
+        theme={queryBrowserTheme}
         width={width}
       >
         <ChartAxis tickCount={xAxisTickCount} tickFormat={xAxisTickFormat} />
@@ -524,7 +535,8 @@ const maxStacks = 50;
 // so don't update unless the number of samples would change by at least this proportion
 const samplesLeeway = 0.2;
 
-// Minimum step (milliseconds between data samples) because tiny steps reduce performance for almost no benefit
+// Minimum step (milliseconds between data samples) because tiny steps reduce performance for almost
+// no benefit
 const minStep = 5 * 1000;
 
 // Don't allow zooming to less than this number of milliseconds

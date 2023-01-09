@@ -114,6 +114,7 @@ import VirtualizedTable, { TableData } from './factory/Table/VirtualizedTable';
 import { sortResourceByValue } from './factory/Table/sort';
 import { useActiveColumns } from './factory/Table/active-columns-hook';
 import { PodDisruptionBudgetField } from '@console/app/src/components/pdb/PodDisruptionBudgetField';
+import { PodTraffic } from './pod-traffic';
 // Only request metrics if the device's screen width is larger than the
 // breakpoint where metrics are visible.
 const showMetrics =
@@ -229,6 +230,11 @@ const podColumnInfo = Object.freeze({
     id: 'ipaddress',
     title: 'public~IP address',
   },
+  traffic: {
+    classes: '',
+    id: 'trafficStatus',
+    title: 'public~Receiving Traffic',
+  },
 });
 
 const kind = 'Pod';
@@ -327,6 +333,12 @@ const getColumns = (showNodes: boolean, t: TFunction): TableColumn<PodKind>[] =>
     sort: 'status.podIP',
     transforms: [sortable],
     props: { className: podColumnInfo.ipaddress.classes },
+    additional: true,
+  },
+  {
+    title: t(podColumnInfo.traffic.title),
+    id: podColumnInfo.traffic.id,
+    props: { className: podColumnInfo.traffic.classes },
     additional: true,
   },
   {
@@ -445,6 +457,13 @@ const PodTableRow: React.FC<RowProps<PodKind, PodRowData>> = ({
         id={podColumnInfo.ipaddress.id}
       >
         {pod?.status?.podIP ?? '-'}
+      </TableData>
+      <TableData
+        className={podColumnInfo.traffic.classes}
+        activeColumnIDs={activeColumnIDs}
+        id={podColumnInfo.traffic.id}
+      >
+        <PodTraffic podName={name} namespace={namespace} />
       </TableData>
       <TableData className={Kebab.columnClass} activeColumnIDs={activeColumnIDs} id="">
         <LazyActionMenu context={context} isDisabled={phase === 'Terminating'} />
@@ -742,6 +761,7 @@ export const PodDetailsList: React.FC<PodDetailsListProps> = ({ pod }) => {
           : t('public~Not configured')}
       </DetailsItem>
       <DetailsItem label={t('public~Pod IP')} obj={pod} path="status.podIP" />
+      <DetailsItem label={t('public~Host IP')} obj={pod} path="status.hostIP" />
       <DetailsItem label={t('public~Node')} obj={pod} path="spec.nodeName" hideEmpty>
         <NodeLink name={pod.spec.nodeName} />
       </DetailsItem>
@@ -759,6 +779,9 @@ export const PodDetailsList: React.FC<PodDetailsListProps> = ({ pod }) => {
       )}
       <RuntimeClass obj={pod} path="spec.runtimeClassName" />
       <PodDisruptionBudgetField obj={pod} />
+      <DetailsItem label={t('public~Receiving Traffic')} obj={pod}>
+        <PodTraffic podName={pod.metadata.name} namespace={pod.metadata.namespace} />
+      </DetailsItem>
     </dl>
   );
 };
@@ -928,6 +951,7 @@ export const PodList: React.FC<PodListProps> = ({ showNamespaceOverride, showNod
       <VirtualizedTable<PodKind, PodRowData>
         {...props}
         aria-label={t('public~Pods')}
+        label={t('public~Pods')}
         columns={activeColumns}
         Row={PodTableRow}
         rowData={rowData}
@@ -1020,13 +1044,17 @@ export const PodsPage: React.FC<PodPageProps> = ({
   const [data, filteredData, onFilterChange] = useListPageFilter(pods, filters, {
     name: { selected: [nameFilter] },
   });
-
+  const resourceKind = referenceForModel(PodModel);
+  const accessReview = {
+    groupVersionKind: resourceKind,
+    namespace: namespace || 'default',
+  };
   return (
     userSettingsLoaded && (
       <>
         <ListPageHeader title={showTitle ? t('public~Pods') : undefined}>
           {canCreate && (
-            <ListPageCreate groupVersionKind={referenceForModel(PodModel)}>
+            <ListPageCreate groupVersionKind={resourceKind} createAccessReview={accessReview}>
               {t('public~Create Pod')}
             </ListPageCreate>
           )}
@@ -1060,6 +1088,7 @@ export const PodsPage: React.FC<PodPageProps> = ({
             loadError={loadError}
             showNamespaceOverride={showNamespaceOverride}
             showNodes={showNodes}
+            namespace={namespace}
           />
         </ListPageBody>
       </>
@@ -1128,6 +1157,7 @@ type PodListProps = {
   loadError: any;
   showNodes?: boolean;
   showNamespaceOverride?: boolean;
+  namespace?: string;
 };
 
 type PodPageProps = {

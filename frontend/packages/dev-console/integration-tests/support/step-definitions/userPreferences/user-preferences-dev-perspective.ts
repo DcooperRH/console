@@ -1,7 +1,12 @@
 import { Given, When, Then } from 'cypress-cucumber-preprocessor/steps';
 import { modal } from '@console/cypress-integration-tests/views/modal';
 import { nav } from '@console/cypress-integration-tests/views/nav';
-import { addOptions, devNavigationMenu, switchPerspective } from '../../constants';
+import {
+  addOptions,
+  devNavigationMenu,
+  gitAdvancedOptions,
+  switchPerspective,
+} from '../../constants';
 import { gitPO } from '../../pageObjects';
 import {
   getPreferenceDropdown,
@@ -230,4 +235,13 @@ When('user clicks {string} link in Advanced Options section', (linkName: string)
 
 Then('user is able to see Secure Route checkbox is deselected', () => {
   cy.get(gitPO.advancedOptions.routing.secureRoute).should('not.be.checked');
+});
+
+When('user clicks on Container images', () => {
+  addPage.selectCardFromOptions(addOptions.ContainerImage);
+});
+
+Then('user is able to see resources DeploymentConfig is selected', () => {
+  gitPage.selectAdvancedOptions(gitAdvancedOptions.Resources);
+  cy.get(gitPO.advancedOptions.resourcesDropdown).should('contain.text', 'DeploymentConfig');
 });

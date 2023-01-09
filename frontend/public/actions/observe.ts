@@ -1,6 +1,6 @@
 import { action, ActionType as Action } from 'typesafe-actions';
 
-import { Rule } from '../components/monitoring/types';
+import { Rule } from '@console/dynamic-plugin-sdk';
 
 export enum ActionType {
   AlertingSetData = 'alertingSetData',
@@ -18,7 +18,6 @@ export enum ActionType {
   QueryBrowserDeleteAllSeries = 'queryBrowserDeleteAllSeries',
   QueryBrowserDeleteQuery = 'queryBrowserDeleteQuery',
   QueryBrowserDismissNamespaceAlert = 'queryBrowserDismissNamespaceAlert',
-  QueryBrowserInsertText = 'queryBrowserInsertText',
   QueryBrowserPatchQuery = 'queryBrowserPatchQuery',
   QueryBrowserRunQueries = 'queryBrowserRunQueries',
   QueryBrowserSetAllExpanded = 'queryBrowserSetAllExpanded',
@@ -27,6 +26,7 @@ export enum ActionType {
   QueryBrowserSetTimespan = 'queryBrowserSetTimespan',
   QueryBrowserToggleIsEnabled = 'queryBrowserToggleIsEnabled',
   QueryBrowserToggleSeries = 'queryBrowserToggleSeries',
+  QueryBrowserToggleAllSeries = 'queryBrowserToggleAllSeries',
   SetAlertCount = 'SetAlertCount',
   ToggleGraphs = 'toggleGraphs',
 }
@@ -104,13 +104,6 @@ export const queryBrowserDismissNamespaceAlert = () =>
 export const queryBrowserDeleteQuery = (index: number) =>
   action(ActionType.QueryBrowserDeleteQuery, { index });
 
-export const queryBrowserInsertText = (
-  index: number,
-  newText: string,
-  replaceFrom: number,
-  replaceTo: number,
-) => action(ActionType.QueryBrowserInsertText, { index, newText, replaceFrom, replaceTo });
-
 export const queryBrowserPatchQuery = (index: number, patch: { [key: string]: unknown }) =>
   action(ActionType.QueryBrowserPatchQuery, { index, patch });
 
@@ -127,6 +120,9 @@ export const queryBrowserSetPollInterval = (pollInterval: number) =>
 
 export const queryBrowserSetTimespan = (timespan: number) =>
   action(ActionType.QueryBrowserSetTimespan, { timespan });
+
+export const queryBrowserToggleAllSeries = (index: number) =>
+  action(ActionType.QueryBrowserToggleAllSeries, { index });
 
 export const queryBrowserToggleIsEnabled = (index: number) =>
   action(ActionType.QueryBrowserToggleIsEnabled, { index });
@@ -154,13 +150,13 @@ const actions = {
   queryBrowserDeleteAllSeries,
   queryBrowserDeleteQuery,
   queryBrowserDismissNamespaceAlert,
-  queryBrowserInsertText,
   queryBrowserPatchQuery,
   queryBrowserRunQueries,
   queryBrowserSetAllExpanded,
   queryBrowserSetMetrics,
   queryBrowserSetPollInterval,
   queryBrowserSetTimespan,
+  queryBrowserToggleAllSeries,
   queryBrowserToggleIsEnabled,
   queryBrowserToggleSeries,
   setAlertCount,

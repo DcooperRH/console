@@ -1,21 +1,49 @@
-import * as classNames from 'classnames';
-import i18next from 'i18next';
-import * as _ from 'lodash-es';
+import {
+  Action,
+  Alert,
+  AlertSeverity,
+  AlertStates,
+  BlueInfoCircleIcon,
+  GreenCheckCircleIcon,
+  K8sKind,
+  PrometheusAlert,
+  PrometheusEndpoint,
+  PrometheusLabels,
+  RedExclamationCircleIcon,
+  ResourceStatus,
+  RowFilter,
+  RowProps,
+  Rule,
+  Silence,
+  SilenceStates,
+  TableColumn,
+  useActivePerspective,
+  YellowExclamationTriangleIcon,
+} from '@console/dynamic-plugin-sdk';
+import { formatPrometheusDuration } from '@openshift-console/plugin-shared/src/datetime/prometheus';
 import {
   Alert as PFAlert,
+  Breadcrumb,
+  BreadcrumbItem,
   Button,
   CodeBlock,
   CodeBlockCode,
+  Dropdown,
+  DropdownItem,
+  DropdownPosition,
+  DropdownToggle,
+  Flex,
+  FlexItem,
+  KebabToggle,
+  Label,
+  Modal,
+  ModalVariant,
   Popover,
+  Toolbar,
+  ToolbarContent,
+  ToolbarGroup,
+  ToolbarItem,
 } from '@patternfly/react-core';
-import { sortable } from '@patternfly/react-table';
-import * as React from 'react';
-import { Helmet } from 'react-helmet';
-import { useTranslation } from 'react-i18next';
-// eslint-disable-next-line @typescript-eslint/ban-ts-ignore
-// @ts-ignore
-import { useDispatch, useSelector } from 'react-redux';
-import { Link, Redirect, Route, Switch } from 'react-router-dom';
 import {
   BanIcon,
   BellIcon,
@@ -23,23 +51,36 @@ import {
   HourglassHalfIcon,
   OutlinedBellIcon,
 } from '@patternfly/react-icons';
+import { sortable } from '@patternfly/react-table';
+import classNames from 'classnames';
+import i18next from 'i18next';
+import * as _ from 'lodash-es';
+import * as React from 'react';
+import { Helmet } from 'react-helmet';
+import { useTranslation } from 'react-i18next';
+// eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+// @ts-ignore
+import { useDispatch, useSelector } from 'react-redux';
+import { Link, Redirect, Route, Switch } from 'react-router-dom';
 
-import { useActivePerspective, ResourceStatus } from '@console/dynamic-plugin-sdk';
-import {
-  BlueInfoCircleIcon,
-  GreenCheckCircleIcon,
-  RedExclamationCircleIcon,
-  YellowExclamationTriangleIcon,
-} from '@console/shared';
-import { useActiveNamespace } from '@console/shared/src/hooks/useActiveNamespace';
 import { withFallback } from '@console/shared/src/components/error';
+import { useActiveNamespace } from '@console/shared/src/hooks/useActiveNamespace';
+import {
+  ActionServiceProvider,
+  ListPageFilter,
+  ResourceLink,
+  Timestamp,
+  useListPageFilter,
+  VirtualizedTable,
+} from '@console/dynamic-plugin-sdk/src/lib-core';
+import { consoleFetchJSON } from '@console/dynamic-plugin-sdk/src/utils/fetch';
+
 import {
   alertingErrored,
   alertingLoaded,
   alertingLoading,
   alertingSetRules,
 } from '../../actions/observe';
-import { coFetchJSON } from '../../co-fetch';
 import {
   ContainerModel,
   DaemonSetModel,
@@ -50,104 +91,53 @@ import {
   PodModel,
   StatefulSetModel,
 } from '../../models';
-import { K8sKind } from '../../module/k8s';
 import { RootState } from '../../redux';
-import { RowFunctionArgs, Table, TableData, TableProps } from '../factory';
-import { FilterToolbar, RowFilter } from '../filter-toolbar';
-import { confirmModal } from '../modals';
-import { PrometheusLabels } from '../graphs';
-import { AlertmanagerYAMLEditorWrapper } from './alert-manager-yaml-editor';
-import { AlertmanagerConfigWrapper } from './alert-manager-config';
+import { getPrometheusURL } from '../graphs/helpers';
+import { refreshNotificationPollers } from '../notification-drawer';
+import { SectionHeading } from '../utils/headings';
+import { ExternalLink, getURLSearchParams, LinkifyExternal } from '../utils/link';
+import { history } from '../utils/router';
+import { LoadingInline, StatusBox } from '../utils/status-box';
+import AlertmanagerPage from './alertmanager/alertmanager-page';
 import MonitoringDashboardsPage from './dashboards';
-import { Label, Labels } from './labels';
+import { useBoolean } from './hooks/useBoolean';
+import KebabDropdown from './kebab-dropdown';
+import { Labels } from './labels';
 import { QueryBrowserPage, ToggleGraph } from './metrics';
 import { FormatSeriesTitle, QueryBrowser } from './query-browser';
 import { CreateSilence, EditSilence } from './silence-form';
 import { TargetsUI } from './targets';
-import {
-  Alert,
-  Alerts,
-  AlertSeverity,
-  AlertSource,
-  AlertStates,
-  ListPageProps,
-  MonitoringResource,
-  PrometheusAlert,
-  Rule,
-  Silence,
-  Silences,
-  SilenceStates,
-} from './types';
+import { Alerts, AlertSource, MonitoringResource, Silences } from './types';
 import {
   alertDescription,
-  alertingRuleSource,
+  alertingRuleStateOrder,
   AlertResource,
-  alertSource,
+  alertSeverityOrder,
   alertState,
   alertURL,
+  fuzzyCaseInsensitive,
   getAlertsAndRules,
   labelsToParams,
   RuleResource,
+  silenceMatcherEqualitySymbol,
   SilenceResource,
   silenceState,
 } from './utils';
-import { refreshNotificationPollers } from '../notification-drawer';
-import { formatPrometheusDuration } from '../utils/datetime';
-import { ActionsMenu } from '../utils/dropdown';
-import { Firehose } from '../utils/firehose';
-import { SectionHeading, ActionButtons, BreadCrumbs } from '../utils/headings';
-import { Kebab } from '../utils/kebab';
-import { getURLSearchParams, LinkifyExternal } from '../utils/link';
-import { ResourceLink } from '../utils/resource-link';
-import { history } from '../utils/router';
-import { LoadingInline, StatusBox } from '../utils/status-box';
-import { Timestamp } from '../utils/timestamp';
-import { getPrometheusURL, PrometheusEndpoint } from '../graphs/helpers';
-import { breadcrumbsForGlobalConfig } from '../cluster-settings/global-config';
 
 const ruleURL = (rule: Rule) => `${RuleResource.plural}/${_.get(rule, 'id')}`;
+
+const alertingRuleSource = (rule: Rule): AlertSource =>
+  rule.labels?.prometheus === 'openshift-monitoring/k8s' ? AlertSource.Platform : AlertSource.User;
+
+const alertSource = (alert: Alert): AlertSource => alertingRuleSource(alert.rule);
 
 const pollers = {};
 const pollerTimeouts = {};
 
-const silenceAlert = (alert: Alert) => ({
-  callback: () => history.push(`${SilenceResource.plural}/~new?${labelsToParams(alert.labels)}`),
-  label: i18next.t('public~Silence alert'),
-});
+const silenceAlert = (alert: Alert) =>
+  history.push(`${SilenceResource.plural}/~new?${labelsToParams(alert.labels)}`);
 
-const viewAlertRule = (alert: Alert) => ({
-  label: i18next.t('public~View alerting rule'),
-  href: ruleURL(alert.rule),
-});
-
-const editSilence = (silence: Silence) => ({
-  label:
-    silenceState(silence) === SilenceStates.Expired
-      ? i18next.t('public~Recreate silence')
-      : i18next.t('public~Edit silence'),
-  href: `${SilenceResource.plural}/${silence.id}/edit`,
-});
-
-const cancelSilence = (silence: Silence) => ({
-  label: i18next.t('public~Expire silence'),
-  callback: () =>
-    confirmModal({
-      title: i18next.t('public~Expire silence'),
-      message: i18next.t('public~Are you sure you want to expire this silence?'),
-      btnText: i18next.t('public~Expire silence'),
-      executeFn: () =>
-        coFetchJSON
-          .delete(`${window.SERVER_FLAGS.alertManagerBaseURL}/api/v2/silence/${silence.id}`)
-          .then(() => refreshNotificationPollers()),
-    }),
-});
-
-const silenceMenuActions = (silence: Silence) =>
-  silenceState(silence) === SilenceStates.Expired
-    ? [editSilence(silence)]
-    : [editSilence(silence), cancelSilence(silence)];
-
-const SilenceKebab = ({ silence }) => <Kebab options={silenceMenuActions(silence)} />;
+const viewAlertRule = (alert: Alert) => history.push(ruleURL(alert.rule));
 
 const MonitoringResourceIcon: React.FC<MonitoringResourceIconProps> = ({ className, resource }) => (
   <span
@@ -161,15 +151,18 @@ const MonitoringResourceIcon: React.FC<MonitoringResourceIconProps> = ({ classNa
   </span>
 );
 
-const alertStateIcons = {
-  [AlertStates.Firing]: <BellIcon />,
-  [AlertStates.Pending]: <OutlinedBellIcon />,
-  [AlertStates.Silenced]: <BellSlashIcon className="text-muted" />,
-};
-
-const AlertStateIcon: React.FC<{ state: string }> = React.memo(
-  ({ state }) => alertStateIcons[state],
-);
+const AlertStateIcon: React.FC<{ state: string }> = React.memo(({ state }) => {
+  switch (state) {
+    case AlertStates.Firing:
+      return <BellIcon />;
+    case AlertStates.Pending:
+      return <OutlinedBellIcon />;
+    case AlertStates.Silenced:
+      return <BellSlashIcon className="text-muted" />;
+    default:
+      return null;
+  }
+});
 
 const getAlertStateKey = (state) => {
   switch (state) {
@@ -185,7 +178,7 @@ const getAlertStateKey = (state) => {
 };
 
 export const AlertState: React.FC<AlertStateProps> = React.memo(({ state }) => {
-  const icon = alertStateIcons[state];
+  const icon = <AlertStateIcon state={state} />;
 
   return icon ? (
     <>
@@ -335,15 +328,18 @@ export const StateCounts: React.FC<{ alerts: PrometheusAlert[] }> = ({ alerts })
   );
 };
 
-const PopoverField: React.FC<{ body: React.ReactNode; label: string }> = ({ body, label }) => (
-  <Popover headerContent={label} bodyContent={body}>
+const PopoverField: React.FC<{ bodyContent: React.ReactNode; label: string }> = ({
+  bodyContent,
+  label,
+}) => (
+  <Popover headerContent={label} bodyContent={bodyContent}>
     <Button variant="plain" className="details-item__popover-button">
       {label}
     </Button>
   </Popover>
 );
 
-const AlertStateHelp: React.FC<{}> = React.memo(() => {
+const AlertStateHelp: React.FC<{}> = () => {
   const { t } = useTranslation();
   return (
     <dl className="co-inline">
@@ -374,9 +370,9 @@ const AlertStateHelp: React.FC<{}> = React.memo(() => {
       </dd>
     </dl>
   );
-});
+};
 
-const SeverityHelp: React.FC<{}> = React.memo(() => {
+const SeverityHelp: React.FC<{}> = () => {
   const { t } = useTranslation();
   return (
     <dl className="co-inline">
@@ -409,9 +405,9 @@ const SeverityHelp: React.FC<{}> = React.memo(() => {
       </dd>
     </dl>
   );
-});
+};
 
-const SourceHelp: React.FC<{}> = React.memo(() => {
+const SourceHelp: React.FC<{}> = () => {
   const { t } = useTranslation();
   return (
     <dl className="co-inline">
@@ -433,7 +429,11 @@ const SourceHelp: React.FC<{}> = React.memo(() => {
       </dd>
     </dl>
   );
-});
+};
+
+type ActionWithHref = Omit<Action, 'cta'> & { cta: { href: string; external?: boolean } };
+
+const isActionWithHref = (action: Action): action is ActionWithHref => 'href' in action.cta;
 
 const queryBrowserURL = (query: string, namespace: string) =>
   namespace
@@ -473,28 +473,34 @@ const Graph: React.FC<GraphProps> = ({
 };
 
 const tableSilenceClasses = [
-  'pf-u-w-50 pf-u-w-33-on-sm',
-  'pf-m-hidden pf-m-visible-on-sm pf-m-hidden-on-md pf-m-visible-on-lg',
-  '',
-  'pf-m-hidden pf-m-visible-on-sm',
-  Kebab.columnClass,
+  'pf-u-w-50 pf-u-w-33-on-sm', // Name
+  'pf-m-hidden pf-m-visible-on-sm', // Firing alerts
+  '', // State
+  'pf-m-hidden pf-m-visible-on-sm', // Creator
+  'dropdown-kebab-pf pf-c-table__action',
 ];
 
 const SilenceMatchersList = ({ silence }) => (
   <div className={`co-text-${SilenceResource.kind.toLowerCase()}`}>
-    {_.map(silence.matchers, ({ name, isRegex, value }, i) => (
-      <Label key={i} k={name} v={isRegex ? `~${value}` : value} />
+    {_.map(silence.matchers, ({ name, isEqual, isRegex, value }, i) => (
+      <Label className="co-label" key={i}>
+        <span className="co-label__key">{name}</span>
+        <span className="co-label__eq">{silenceMatcherEqualitySymbol(isEqual, isRegex)}</span>
+        <span className="co-label__value">{value}</span>
+      </Label>
     ))}
   </div>
 );
 
-const SilenceTableRow: React.FC<RowFunctionArgs<Silence>> = ({ obj }) => {
+const SilenceTableRow: React.FC<RowProps<Silence>> = ({ obj }) => {
   const { createdBy, endsAt, firingAlerts, id, name, startsAt } = obj;
   const state = silenceState(obj);
 
+  const { t } = useTranslation();
+
   return (
     <>
-      <TableData className={tableSilenceClasses[0]}>
+      <td className={tableSilenceClasses[0]}>
         <div className="co-resource-item">
           <MonitoringResourceIcon resource={SilenceResource} />
           <Link
@@ -509,26 +515,26 @@ const SilenceTableRow: React.FC<RowFunctionArgs<Silence>> = ({ obj }) => {
         <div className="monitoring-label-list">
           <SilenceMatchersList silence={obj} />
         </div>
-      </TableData>
-      <TableData className={tableSilenceClasses[1]}>
+      </td>
+      <td className={tableSilenceClasses[1]}>
         <SeverityCounts alerts={firingAlerts} />
-      </TableData>
-      <TableData className={classNames(tableSilenceClasses[2], 'co-break-word')}>
+      </td>
+      <td className={classNames(tableSilenceClasses[2], 'co-break-word')}>
         <SilenceState silence={obj} />
         {state === SilenceStates.Pending && (
-          <StateTimestamp text={i18next.t('public~Starts')} timestamp={startsAt} />
+          <StateTimestamp text={t('public~Starts')} timestamp={startsAt} />
         )}
         {state === SilenceStates.Active && (
-          <StateTimestamp text={i18next.t('public~Ends')} timestamp={endsAt} />
+          <StateTimestamp text={t('public~Ends')} timestamp={endsAt} />
         )}
         {state === SilenceStates.Expired && (
-          <StateTimestamp text={i18next.t('public~Expired')} timestamp={endsAt} />
+          <StateTimestamp text={t('public~Expired')} timestamp={endsAt} />
         )}
-      </TableData>
-      <TableData className={tableSilenceClasses[3]}>{createdBy || '-'}</TableData>
-      <TableData className={tableSilenceClasses[4]}>
-        <SilenceKebab silence={obj} />
-      </TableData>
+      </td>
+      <td className={tableSilenceClasses[3]}>{createdBy || '-'}</td>
+      <td className={tableSilenceClasses[4]}>
+        <SilenceDropdownKebab silence={obj} />
+      </td>
     </>
   );
 };
@@ -578,8 +584,12 @@ const AlertMessage: React.FC<AlertMessageProps> = ({ alertText, labels, template
         );
         messageParts = _.flatMap(messageParts, (part) => {
           if (_.isString(part) && part.indexOf(labelValue) !== -1) {
-            const [before, after] = part.split(labelValue);
-            return [before, link, after];
+            // `part` contains at least one instance of the resource name, so replace each instance
+            // with the link to the resource. Since the link is a component, we can't simply do a
+            // string substitution. Instead, create an array that contains each of the string parts
+            // and the resource links in the correct order.
+            const splitParts = part.split(labelValue);
+            return _.flatMap(splitParts, (p) => [p, link]).slice(0, -1);
           }
           return [part];
         });
@@ -607,37 +617,6 @@ const HeaderAlertMessage: React.FC<{ alert: Alert; rule: Rule }> = ({ alert, rul
   );
 };
 
-const getSilenceTableHeader = (t) => [
-  {
-    title: t('public~Name'),
-    sortField: 'name',
-    transforms: [sortable],
-    props: { className: tableSilenceClasses[0] },
-  },
-  {
-    title: t('public~Firing alerts'),
-    sortFunc: 'silenceFiringAlertsOrder',
-    transforms: [sortable],
-    props: { className: tableSilenceClasses[1] },
-  },
-  {
-    title: t('public~State'),
-    sortFunc: 'silenceStateOrder',
-    transforms: [sortable],
-    props: { className: tableSilenceClasses[2] },
-  },
-  {
-    title: t('public~Creator'),
-    sortField: 'createdBy',
-    transforms: [sortable],
-    props: { className: tableSilenceClasses[3] },
-  },
-  {
-    title: '',
-    props: { className: tableSilenceClasses[4] },
-  },
-];
-
 const getSourceKey = (source) => {
   switch (source) {
     case 'Platform':
@@ -649,9 +628,52 @@ const getSourceKey = (source) => {
   }
 };
 
-const getSilenceProps = (obj) => ({
-  id: obj.id,
-});
+const SilencedByList: React.FC<{ silences: Silence[] }> = ({ silences }) => {
+  const { t } = useTranslation();
+
+  const columns = React.useMemo<TableColumn<Silence>[]>(
+    () => [
+      {
+        id: 'name',
+        props: { className: tableSilenceClasses[0] },
+        title: t('public~Name'),
+      },
+      {
+        id: 'firingAlerts',
+        props: { className: tableSilenceClasses[1] },
+        title: t('public~Firing alerts'),
+      },
+      {
+        id: 'state',
+        props: { className: tableSilenceClasses[2] },
+        title: t('public~State'),
+      },
+      {
+        id: 'createdBy',
+        props: { className: tableSilenceClasses[3] },
+        title: t('public~Creator'),
+      },
+      {
+        id: 'actions',
+        props: { className: tableSilenceClasses[4] },
+        title: '',
+      },
+    ],
+    [t],
+  );
+
+  return (
+    <VirtualizedTable<Silence>
+      aria-label={t('public~Silenced by')}
+      columns={columns}
+      data={silences}
+      loaded={true}
+      loadError={undefined}
+      Row={SilenceTableRow}
+      unfilteredData={silences}
+    />
+  );
+};
 
 const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
   const { t } = useTranslation();
@@ -671,12 +693,12 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
 
   const state = alertState(alert);
 
-  const silencesTableHeader = () =>
-    getSilenceTableHeader(t).map((h) => _.pick(h, ['title', 'props']));
-
   const labelsMemoKey = JSON.stringify(alert?.labels);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const labels: PrometheusLabels = React.useMemo(() => alert?.labels, [labelsMemoKey]);
+
+  // eslint-disable-next-line camelcase
+  const runbookURL = alert?.annotations?.runbook_url;
 
   return (
     <>
@@ -690,15 +712,17 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
         loadError={alerts?.loadError}
       >
         <div className="pf-c-page__main-breadcrumb">
-          <BreadCrumbs
-            breadcrumbs={[
-              {
-                name: t('public~Alerts'),
-                path: namespace ? `/dev-monitoring/ns/${namespace}/alerts` : '/monitoring/alerts',
-              },
-              { name: t('public~Alert details'), path: undefined },
-            ]}
-          />
+          <Breadcrumb className="monitoring-breadcrumbs">
+            <BreadcrumbItem>
+              <Link
+                className="pf-c-breadcrumb__link"
+                to={namespace ? `/dev-monitoring/ns/${namespace}/alerts` : '/monitoring/alerts'}
+              >
+                {t('public~Alerts')}
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbItem isActive>{t('public~Alert details')}</BreadcrumbItem>
+          </Breadcrumb>
         </div>
         <div className="co-m-nav-title co-m-nav-title--detail co-m-nav-title--breadcrumbs">
           <h1 className="co-m-pane__heading">
@@ -708,16 +732,44 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
               <SeverityBadge severity={labels?.severity} />
             </div>
             {state !== AlertStates.Silenced && (
-              <div className="co-actions" data-test-id="details-actions">
-                <ActionButtons actionButtons={[silenceAlert(alert)]} />
+              <div data-test-id="details-actions">
+                <Button
+                  className="co-action-buttons__btn"
+                  onClick={() => silenceAlert(alert)}
+                  variant="primary"
+                >
+                  {t('public~Silence alert')}
+                </Button>
               </div>
             )}
           </h1>
           <HeaderAlertMessage alert={alert} rule={rule} />
         </div>
         <div className="co-m-pane__body">
-          <ToggleGraph />
-          <SectionHeading text={t('public~Alert details')} />
+          <Toolbar className="monitoring-alert-detail-toolbar">
+            <ToolbarContent>
+              <ToolbarItem variant="label">
+                <SectionHeading text={t('public~Alert details')} />
+              </ToolbarItem>
+              <ToolbarGroup alignment={{ default: 'alignRight' }}>
+                <ActionServiceProvider context={{ 'alert-detail-toolbar-actions': { alert } }}>
+                  {({ actions, loaded }) =>
+                    loaded
+                      ? actions.filter(isActionWithHref).map((action) => (
+                          <ToolbarItem key={action.id}>
+                            <Link to={action.cta.href}>{action.label}</Link>
+                          </ToolbarItem>
+                        ))
+                      : null
+                  }
+                </ActionServiceProvider>
+                <ToolbarItem>
+                  <ToggleGraph />
+                </ToolbarItem>
+              </ToolbarGroup>
+            </ToolbarContent>
+          </Toolbar>
+
           <div className="co-m-pane__body-group">
             <div className="row">
               <div className="col-sm-12">
@@ -735,7 +787,7 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                   <dt>{t('public~Name')}</dt>
                   <dd>{labels?.alertname}</dd>
                   <dt>
-                    <PopoverField label={t('public~Severity')} body={SeverityHelp} />
+                    <PopoverField bodyContent={<SeverityHelp />} label={t('public~Severity')} />
                   </dt>
                   <dd>
                     <Severity severity={labels?.severity} />
@@ -770,16 +822,24 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                       </dd>
                     </>
                   )}
+                  {runbookURL && (
+                    <>
+                      <dt>{t('public~Runbook')}</dt>
+                      <dd>
+                        <ExternalLink href={runbookURL} text={runbookURL} />
+                      </dd>
+                    </>
+                  )}
                 </dl>
               </div>
               <div className="col-sm-6">
                 <dl className="co-m-pane__details">
                   <dt>
-                    <PopoverField label={t('public~Source')} body={SourceHelp} />
+                    <PopoverField bodyContent={<SourceHelp />} label={t('public~Source')} />
                   </dt>
                   <dd>{alert && getSourceKey(_.startCase(alertSource(alert)))}</dd>
                   <dt>
-                    <PopoverField label={t('public~State')} body={AlertStateHelp} />
+                    <PopoverField bodyContent={<AlertStateHelp />} label={t('public~State')} />
                   </dt>
                   <dd>
                     <AlertState state={state} />
@@ -788,6 +848,8 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                 </dl>
               </div>
             </div>
+          </div>
+          <div className="co-m-pane__body-group">
             <div className="row">
               <div className="col-xs-12">
                 <dl className="co-m-pane__details" data-test="label-list">
@@ -798,6 +860,8 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                 </dl>
               </div>
             </div>
+          </div>
+          <div className="co-m-pane__body-group">
             <div className="row">
               <div className="col-xs-12">
                 <dl className="co-m-pane__details">
@@ -829,14 +893,7 @@ const AlertsDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
               <SectionHeading text={t('public~Silenced by')} />
               <div className="row">
                 <div className="col-xs-12">
-                  <Table
-                    aria-label={t('public~Silenced by')}
-                    data={alert?.silencedBy}
-                    Header={silencesTableHeader}
-                    loaded={true}
-                    Row={SilenceTableRow}
-                    getRowProps={getSilenceProps}
-                  />
+                  <SilencedByList silences={alert?.silencedBy} />
                 </div>
               </div>
             </div>
@@ -900,7 +957,13 @@ const ActiveAlerts: React.FC<{ alerts; ruleID: string; namespace: string }> = (p
             <div className="col-sm-2 col-xs-3 co-truncate">{a.value}</div>
             {a.state !== AlertStates.Silenced && (
               <div className="dropdown-kebab-pf">
-                <Kebab options={[silenceAlert(a)]} />
+                <KebabDropdown
+                  dropdownItems={[
+                    <DropdownItem component="button" key="silence" onClick={() => silenceAlert(a)}>
+                      {t('public~Silence alert')}
+                    </DropdownItem>,
+                  ]}
+                />
               </div>
             )}
           </div>
@@ -931,6 +994,9 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
     return `${nameLabel}{${_.map(otherLabels, (v, k) => `${k}="${v}"`).join(',')}}`;
   };
 
+  // eslint-disable-next-line camelcase
+  const runbookURL = rule?.annotations?.runbook_url;
+
   return (
     <>
       <Helmet>
@@ -938,17 +1004,17 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
       </Helmet>
       <StatusBox data={rule} label={RuleResource.label} loaded={loaded} loadError={loadError}>
         <div className="pf-c-page__main-breadcrumb">
-          <BreadCrumbs
-            breadcrumbs={[
-              {
-                name: namespace ? t('public~Alerts') : t('public~Alerting rules'),
-                path: namespace
-                  ? `/dev-monitoring/ns/${namespace}/alerts`
-                  : '/monitoring/alertrules',
-              },
-              { name: t('public~Alerting rule details'), path: undefined },
-            ]}
-          />
+          <Breadcrumb className="monitoring-breadcrumbs">
+            <BreadcrumbItem>
+              <Link
+                className="pf-c-breadcrumb__link"
+                to={namespace ? `/dev-monitoring/ns/${namespace}/alerts` : '/monitoring/alertrules'}
+              >
+                {namespace ? t('public~Alerts') : t('public~Alerting rules')}
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbItem isActive>{t('public~Alerting rule details')}</BreadcrumbItem>
+          </Breadcrumb>
         </div>
         <div className="co-m-nav-title co-m-nav-title--detail co-m-nav-title--breadcrumbs">
           <h1 className="co-m-pane__heading">
@@ -970,7 +1036,7 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                   <dt>{t('public~Name')}</dt>
                   <dd>{rule?.name}</dd>
                   <dt>
-                    <PopoverField label={t('public~Severity')} body={SeverityHelp} />
+                    <PopoverField bodyContent={<SeverityHelp />} label={t('public~Severity')} />
                   </dt>
                   <dd>
                     <Severity severity={rule?.labels?.severity} />
@@ -997,12 +1063,20 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                       </dd>
                     </>
                   )}
+                  {runbookURL && (
+                    <>
+                      <dt>{t('public~Runbook')}</dt>
+                      <dd>
+                        <ExternalLink href={runbookURL} text={runbookURL} />
+                      </dd>
+                    </>
+                  )}
                 </dl>
               </div>
               <div className="col-sm-6">
                 <dl className="co-m-pane__details">
                   <dt>
-                    <PopoverField label={t('public~Source')} body={SourceHelp} />
+                    <PopoverField bodyContent={<SourceHelp />} label={t('public~Source')} />
                   </dt>
                   <dd>{rule && getSourceKey(_.startCase(alertingRuleSource(rule)))}</dd>
                   {_.isInteger(rule?.duration) && (
@@ -1024,6 +1098,8 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
                 </dl>
               </div>
             </div>
+          </div>
+          <div className="co-m-pane__body-group">
             <div className="row">
               <div className="col-xs-12">
                 <dl className="co-m-pane__details">
@@ -1038,8 +1114,18 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
         </div>
         <div className="co-m-pane__body">
           <div className="co-m-pane__body-group">
-            <ToggleGraph />
-            <SectionHeading text={t('public~Active alerts')} />
+            <Toolbar className="monitoring-alert-detail-toolbar">
+              <ToolbarContent>
+                <ToolbarItem variant="label">
+                  <SectionHeading text={t('public~Active alerts')} />
+                </ToolbarItem>
+                <ToolbarGroup alignment={{ default: 'alignRight' }}>
+                  <ToolbarItem>
+                    <ToggleGraph />
+                  </ToolbarItem>
+                </ToolbarGroup>
+              </ToolbarContent>
+            </Toolbar>
             <div className="row">
               <div className="col-sm-12">
                 <Graph
@@ -1067,6 +1153,141 @@ const AlertRulesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
   );
 };
 export const AlertRulesDetailsPage = withFallback(AlertRulesDetailsPage_);
+
+type ExpireSilenceModalProps = {
+  isOpen: boolean;
+  setClosed: () => void;
+  silenceId: string;
+};
+
+const ExpireSilenceModal: React.FC<ExpireSilenceModalProps> = ({
+  isOpen,
+  setClosed,
+  silenceId,
+}) => {
+  const { t } = useTranslation();
+
+  const [isInProgress, , setInProgress, setNotInProgress] = useBoolean(false);
+  const [errorMessage, setErrorMessage] = React.useState();
+
+  const expireSilence = () => {
+    setInProgress();
+    consoleFetchJSON
+      .delete(`${window.SERVER_FLAGS.alertManagerBaseURL}/api/v2/silence/${silenceId}`)
+      .then(() => {
+        refreshNotificationPollers();
+        setClosed();
+      })
+      .catch((err) => {
+        setErrorMessage(_.get(err, 'json.error') || err.message || 'Error saving silence');
+        setNotInProgress();
+      })
+      .then(setNotInProgress);
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      position="top"
+      showClose={false}
+      title={t('public~Expire silence')}
+      variant={ModalVariant.small}
+    >
+      <Flex direction={{ default: 'column' }}>
+        <FlexItem>{t('public~Are you sure you want to expire this silence?')}</FlexItem>
+        <Flex direction={{ default: 'column' }}>
+          <FlexItem>
+            {errorMessage && (
+              <PFAlert
+                className="co-alert co-alert--scrollable"
+                isInline
+                title={t('public~An error occurred')}
+                variant="danger"
+              >
+                <div className="co-pre-line">{errorMessage}</div>
+              </PFAlert>
+            )}
+          </FlexItem>
+          <Flex>
+            <FlexItem>{isInProgress && <LoadingInline />}</FlexItem>
+            <FlexItem align={{ default: 'alignRight' }}>
+              <Button variant="secondary" onClick={setClosed}>
+                {t('public~Cancel')}
+              </Button>
+            </FlexItem>
+            <FlexItem>
+              <Button variant="primary" onClick={expireSilence}>
+                {t('public~Expire silence')}
+              </Button>
+            </FlexItem>
+          </Flex>
+        </Flex>
+      </Flex>
+    </Modal>
+  );
+};
+
+const SilenceDropdown: React.FC<SilenceDropdownProps> = ({
+  className,
+  isPlain,
+  silence,
+  Toggle,
+}) => {
+  const { t } = useTranslation();
+
+  const [isOpen, setIsOpen, , setClosed] = useBoolean(false);
+  const [isModalOpen, , setModalOpen, setModalClosed] = useBoolean(false);
+
+  const editSilence = () => {
+    history.push(`${SilenceResource.plural}/${silence.id}/edit`);
+  };
+
+  const dropdownItems =
+    silenceState(silence) === SilenceStates.Expired
+      ? [
+          <DropdownItem key="edit-silence" component="button" onClick={editSilence}>
+            {t('public~Recreate silence')}
+          </DropdownItem>,
+        ]
+      : [
+          <DropdownItem key="edit-silence" component="button" onClick={editSilence}>
+            {t('public~Edit silence')}
+          </DropdownItem>,
+          <DropdownItem key="cancel-silence" component="button" onClick={setModalOpen}>
+            {t('public~Expire silence')}
+          </DropdownItem>,
+        ];
+
+  return (
+    <>
+      <Dropdown
+        className={className}
+        data-test="silence-actions"
+        dropdownItems={dropdownItems}
+        isOpen={isOpen}
+        isPlain={isPlain}
+        onSelect={setClosed}
+        position={DropdownPosition.right}
+        toggle={<Toggle onToggle={setIsOpen} />}
+      />
+      <ExpireSilenceModal isOpen={isModalOpen} setClosed={setModalClosed} silenceId={silence.id} />
+    </>
+  );
+};
+
+const SilenceDropdownKebab: React.FC<{ silence: Silence }> = ({ silence }) => (
+  <SilenceDropdown isPlain silence={silence} Toggle={KebabToggle} />
+);
+
+const ActionsToggle: React.FC<{ onToggle: OnToggle }> = ({ onToggle, ...props }) => (
+  <DropdownToggle data-test="silence-actions-toggle" onToggle={onToggle} {...props}>
+    Actions
+  </DropdownToggle>
+);
+
+const SilenceDropdownActions: React.FC<{ silence: Silence }> = ({ silence }) => (
+  <SilenceDropdown className="co-actions-menu" silence={silence} Toggle={ActionsToggle} />
+);
 
 const SilencedAlertsList = ({ alerts }) => {
   const { t } = useTranslation();
@@ -1096,7 +1317,13 @@ const SilencedAlertsList = ({ alerts }) => {
               <Severity severity={a.labels.severity} />
             </div>
             <div className="dropdown-kebab-pf">
-              <Kebab options={[viewAlertRule(a)]} />
+              <KebabDropdown
+                dropdownItems={[
+                  <DropdownItem key="view-rule" onClick={() => viewAlertRule(a)}>
+                    {t('public~View alerting rule')}
+                  </DropdownItem>,
+                ]}
+              />
             </div>
           </div>
         ))}
@@ -1131,18 +1358,21 @@ const SilencesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
         loadError={silences?.loadError}
       >
         <div className="pf-c-page__main-breadcrumb">
-          <BreadCrumbs
-            breadcrumbs={[
-              {
-                name: perspective === 'dev' ? t('public~Alerts') : t('public~Silences'),
-                path:
+          <Breadcrumb className="monitoring-breadcrumbs">
+            <BreadcrumbItem>
+              <Link
+                className="pf-c-breadcrumb__link"
+                to={
                   perspective === 'dev'
                     ? `/dev-monitoring/ns/${namespace}/alerts`
-                    : '/monitoring/silences',
-              },
-              { name: t('public~Silence details'), path: undefined },
-            ]}
-          />
+                    : '/monitoring/silences'
+                }
+              >
+                {perspective === 'dev' ? t('public~Alerts') : t('public~Silences')}
+              </Link>
+            </BreadcrumbItem>
+            <BreadcrumbItem isActive>{t('public~Silence details')}</BreadcrumbItem>
+          </Breadcrumb>
         </div>
         <div className="co-m-nav-title co-m-nav-title--detail co-m-nav-title--breadcrumbs">
           <h1 className="co-m-pane__heading">
@@ -1154,7 +1384,7 @@ const SilencesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
               {silence?.name}
             </div>
             <div className="co-actions" data-test-id="details-actions">
-              {silence && <ActionsMenu actions={silenceMenuActions(silence)} />}
+              {silence && <SilenceDropdownActions silence={silence} />}
             </div>
           </h1>
         </div>
@@ -1236,21 +1466,38 @@ const SilencesDetailsPage_: React.FC<{ match: any }> = ({ match }) => {
 const SilencesDetailsPage = withFallback(SilencesDetailsPage_);
 
 const tableAlertClasses = [
-  'pf-u-w-50 pf-u-w-33-on-sm',
-  'pf-m-hidden pf-m-visible-on-sm',
-  '',
-  'pf-m-hidden pf-m-visible-on-sm',
-  Kebab.columnClass,
+  'pf-u-w-50 pf-u-w-33-on-sm', // Name
+  'pf-m-hidden pf-m-visible-on-sm', // Severity
+  '', // State
+  'pf-m-hidden pf-m-visible-on-sm', // Source
+  'dropdown-kebab-pf pf-c-table__action',
 ];
 
-const AlertTableRow: React.FC<RowFunctionArgs<Alert>> = ({ obj }) => {
+const AlertTableRow: React.FC<RowProps<Alert>> = ({ obj }) => {
+  const { t } = useTranslation();
+
   const { annotations = {}, labels } = obj;
   const description = annotations.description || annotations.message;
   const state = alertState(obj);
 
+  const title: string = obj.annotations?.description || obj.annotations?.message;
+
+  const dropdownItems = [
+    <DropdownItem key="view-rule" onClick={() => viewAlertRule(obj)}>
+      {t('public~View alerting rule')}
+    </DropdownItem>,
+  ];
+  if (state !== AlertStates.Silenced) {
+    dropdownItems.unshift(
+      <DropdownItem key="silence-alert" onClick={() => silenceAlert(obj)}>
+        {t('public~Silence alert')}
+      </DropdownItem>,
+    );
+  }
+
   return (
     <>
-      <TableData className={tableAlertClasses[0]}>
+      <td className={tableAlertClasses[0]} title={title}>
         <div className="co-resource-item">
           <MonitoringResourceIcon resource={AlertResource} />
           <Link
@@ -1262,33 +1509,27 @@ const AlertTableRow: React.FC<RowFunctionArgs<Alert>> = ({ obj }) => {
           </Link>
         </div>
         <div className="monitoring-description">{description}</div>
-      </TableData>
-      <TableData className={tableAlertClasses[1]}>
+      </td>
+      <td className={tableAlertClasses[1]} title={title}>
         <Severity severity={labels?.severity} />
-      </TableData>
-      <TableData className={tableAlertClasses[2]}>
+      </td>
+      <td className={tableAlertClasses[2]} title={title}>
         <AlertState state={state} />
         <AlertStateDescription alert={obj} />
-      </TableData>
-      <TableData className={tableAlertClasses[3]}>
-        {alertSource(obj) === AlertSource.User
-          ? i18next.t('public~User')
-          : i18next.t('public~Platform')}
-      </TableData>
-      <TableData className={tableAlertClasses[4]}>
-        <Kebab
-          options={
-            state === AlertStates.Silenced
-              ? [viewAlertRule(obj)]
-              : [silenceAlert(obj), viewAlertRule(obj)]
-          }
-        />
-      </TableData>
+      </td>
+      <td className={tableAlertClasses[3]} title={title}>
+        {alertSource(obj) === AlertSource.User ? t('public~User') : t('public~Platform')}
+      </td>
+      <td className={tableAlertClasses[4]} title={title}>
+        <KebabDropdown dropdownItems={dropdownItems} />
+      </td>
     </>
   );
 };
 
 export const severityRowFilter = (): RowFilter => ({
+  filter: (filter, alert: Alert) =>
+    filter.selected?.includes(alert.labels?.severity) || _.isEmpty(filter.selected),
   filterGroupName: i18next.t('public~Severity'),
   items: [
     { id: AlertSeverity.Critical, title: i18next.t('public~Critical') },
@@ -1298,102 +1539,6 @@ export const severityRowFilter = (): RowFilter => ({
   ],
   reducer: ({ labels }: Alert | Rule) => labels?.severity,
   type: 'alert-severity',
-});
-
-const alertsRowFilters = (): RowFilter[] => [
-  {
-    defaultSelected: [AlertStates.Firing],
-    filterGroupName: i18next.t('public~Alert State'),
-    items: [
-      { id: AlertStates.Firing, title: i18next.t('public~Firing') },
-      { id: AlertStates.Pending, title: i18next.t('public~Pending') },
-      { id: AlertStates.Silenced, title: i18next.t('public~Silenced') },
-    ],
-    reducer: alertState,
-    type: 'alert-state',
-  },
-  severityRowFilter(),
-  {
-    defaultSelected: [AlertSource.Platform],
-    filterGroupName: i18next.t('public~Source'),
-    items: [
-      { id: AlertSource.Platform, title: i18next.t('public~Platform') },
-      { id: AlertSource.User, title: i18next.t('public~User') },
-    ],
-    reducer: alertSource,
-    type: 'alert-source',
-  },
-];
-
-const MonitoringListPage: React.FC<ListPageProps & {
-  getRowProps?: TableProps['getRowProps'];
-}> = ({
-  CreateButton,
-  data,
-  defaultSortField,
-  Header,
-  hideLabelFilter,
-  kindPlural,
-  labelFilter,
-  labelPath,
-  loaded,
-  loadError,
-  nameFilterID,
-  reduxID,
-  Row,
-  rowFilters,
-  getRowProps,
-  TopAlert,
-}) => {
-  const filters = useSelector(({ k8s }: RootState) => k8s.getIn([reduxID, 'filters']));
-
-  return (
-    <>
-      <Helmet>
-        <title>Alerting</title>
-      </Helmet>
-      <div className="co-m-pane__body">
-        {CreateButton && (
-          <div className="co-m-pane__createLink--no-title">
-            <CreateButton />
-          </div>
-        )}
-        <FilterToolbar
-          data={data}
-          hideLabelFilter={hideLabelFilter}
-          labelFilter={labelFilter}
-          labelPath={labelPath}
-          reduxIDs={[reduxID]}
-          rowFilters={rowFilters}
-          textFilter={nameFilterID}
-        />
-        {TopAlert}
-        <div className="row">
-          <div className="col-xs-12">
-            <Table
-              aria-label={kindPlural}
-              data={data}
-              defaultSortField={defaultSortField}
-              filters={filters?.toJS()}
-              Header={Header}
-              loaded={loaded}
-              loadError={loadError}
-              reduxID={reduxID}
-              Row={Row}
-              rowFilters={rowFilters}
-              virtualize
-              getRowProps={getRowProps}
-            />
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-const getRowProps = (obj: Alert | Rule) => ({
-  id: (obj as Alert).rule?.id,
-  title: obj.annotations?.description || obj.annotations?.message,
 });
 
 const SilencesNotLoadedWarning: React.FC<{ silencesLoadError: any }> = ({ silencesLoadError }) => {
@@ -1412,66 +1557,136 @@ const SilencesNotLoadedWarning: React.FC<{ silencesLoadError: any }> = ({ silenc
   );
 };
 
+// Sort alerts by their state (sort first by the state itself, then by the timestamp relevant to
+// the state)
+const alertStateOrder = (alert: Alert) => [
+  [AlertStates.Firing, AlertStates.Pending, AlertStates.Silenced].indexOf(alertState(alert)),
+  alertState(alert) === AlertStates.Silenced
+    ? _.max(_.map(alert.silencedBy, 'endsAt'))
+    : _.get(alert, 'activeAt'),
+];
+
 const AlertsPage_: React.FC<Alerts> = () => {
   const { t } = useTranslation();
 
-  const { data, loaded, loadError }: Alerts = useSelector(
+  const { data, loaded = false, loadError }: Alerts = useSelector(
     ({ observe }: RootState) => observe.get('alerts') || {},
   );
   const silencesLoadError = useSelector(
     ({ observe }: RootState) => observe.get('silences')?.loadError,
   );
 
-  const Header = () => [
+  const nameFilter: RowFilter = {
+    filter: (filter, alert: Alert) =>
+      fuzzyCaseInsensitive(filter.selected?.[0], alert.labels?.alertname),
+    items: [],
+    type: 'name',
+  } as RowFilter;
+
+  const rowFilters: RowFilter[] = [
     {
-      title: t('public~Name'),
-      sortField: 'labels.alertname',
-      transforms: [sortable],
-      props: { className: tableAlertClasses[0] },
+      defaultSelected: [AlertStates.Firing],
+      filter: (filter, alert: Alert) =>
+        filter.selected?.includes(alertState(alert)) || _.isEmpty(filter.selected),
+      filterGroupName: t('public~Alert State'),
+      items: [
+        { id: AlertStates.Firing, title: t('public~Firing') },
+        { id: AlertStates.Pending, title: t('public~Pending') },
+        { id: AlertStates.Silenced, title: t('public~Silenced') },
+      ],
+      reducer: alertState,
+      type: 'alert-state',
     },
+    severityRowFilter(),
     {
-      title: t('public~Severity'),
-      sortFunc: 'alertSeverityOrder',
-      transforms: [sortable],
-      props: { className: tableAlertClasses[1] },
-    },
-    {
-      title: t('public~State'),
-      sortFunc: 'alertStateOrder',
-      transforms: [sortable],
-      props: { className: tableAlertClasses[2] },
-    },
-    {
-      title: t('public~Source'),
-      sortFunc: 'alertSource',
-      transforms: [sortable],
-      props: { className: tableAlertClasses[3] },
-    },
-    {
-      title: '',
-      props: { className: tableAlertClasses[4] },
+      defaultSelected: [AlertSource.Platform],
+      filter: (filter, alert: Alert) =>
+        filter.selected?.includes(alertSource(alert)) || _.isEmpty(filter.selected),
+      filterGroupName: t('public~Source'),
+      items: [
+        { id: AlertSource.Platform, title: t('public~Platform') },
+        { id: AlertSource.User, title: t('public~User') },
+      ],
+      reducer: alertSource,
+      type: 'alert-source',
     },
   ];
 
+  const allFilters: RowFilter[] = [nameFilter, ...rowFilters];
+  const [staticData, filteredData, onFilterChange] = useListPageFilter(data, allFilters);
+
+  const columns = React.useMemo<TableColumn<Alert>[]>(
+    () => [
+      {
+        id: 'name',
+        props: { className: tableAlertClasses[0] },
+        sort: 'labels.alertname',
+        title: t('public~Name'),
+        transforms: [sortable],
+      },
+      {
+        id: 'severity',
+        props: { className: tableAlertClasses[1] },
+        sort: (alerts: Alert[], direction: 'asc' | 'desc') =>
+          _.orderBy(alerts, alertSeverityOrder, [direction]) as Alert[],
+        title: t('public~Severity'),
+        transforms: [sortable],
+      },
+      {
+        id: 'state',
+        props: { className: tableAlertClasses[2] },
+        sort: (alerts: Alert[], direction: 'asc' | 'desc') =>
+          _.orderBy(alerts, alertStateOrder, [direction]),
+        title: t('public~State'),
+        transforms: [sortable],
+      },
+      {
+        id: 'source',
+        props: { className: tableAlertClasses[3] },
+        sort: (alerts: Alert[], direction: 'asc' | 'desc') =>
+          _.orderBy(alerts, alertSource, [direction]),
+        title: t('public~Source'),
+        transforms: [sortable],
+      },
+      {
+        id: 'actions',
+        props: { className: tableAlertClasses[4] },
+        title: '',
+      },
+    ],
+    [t],
+  );
+
   return (
-    <MonitoringListPage
-      data={data}
-      defaultSortField="labels.alertname"
-      Header={Header}
-      kindPlural={t('public~Alerts')}
-      labelFilter="alerts"
-      labelPath="labels"
-      loaded={loaded}
-      loadError={loadError}
-      nameFilterID="resource-list-text"
-      reduxID="monitoringAlerts"
-      Row={AlertTableRow}
-      rowFilters={alertsRowFilters()}
-      getRowProps={getRowProps}
-      TopAlert={
-        silencesLoadError && <SilencesNotLoadedWarning silencesLoadError={silencesLoadError} />
-      }
-    />
+    <>
+      <Helmet>
+        <title>Alerting</title>
+      </Helmet>
+      <div className="co-m-pane__body">
+        <ListPageFilter
+          data={staticData}
+          labelFilter="alerts"
+          labelPath="labels"
+          loaded={loaded}
+          onFilterChange={onFilterChange}
+          rowFilters={rowFilters}
+        />
+        {silencesLoadError && <SilencesNotLoadedWarning silencesLoadError={silencesLoadError} />}
+        <div className="row">
+          <div className="col-xs-12">
+            <VirtualizedTable<Alert>
+              aria-label={t('public~Alerts')}
+              columns={columns}
+              data={filteredData ?? []}
+              loaded={loaded}
+              loadError={loadError}
+              Row={AlertTableRow}
+              unfilteredData={data}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 const AlertsPage = withFallback(AlertsPage_);
@@ -1498,79 +1713,64 @@ export const alertStateFilter = (): RowFilter => ({
 });
 
 const tableRuleClasses = [
-  'pf-u-w-50 pf-u-w-33-on-sm',
-  'pf-m-hidden pf-m-visible-on-sm',
-  '',
-  'pf-m-hidden pf-m-visible-on-sm',
+  'pf-u-w-50 pf-u-w-33-on-sm', // Name
+  'pf-m-hidden pf-m-visible-on-sm', // Severity
+  '', // Alert state
+  'pf-m-hidden pf-m-visible-on-sm', // Source
 ];
 
-const RuleTableRow: React.FC<RowFunctionArgs<Rule>> = ({ obj }) => (
-  <>
-    <TableData className={tableRuleClasses[0]}>
-      <div className="co-resource-item">
-        <MonitoringResourceIcon resource={RuleResource} />
-        <Link to={ruleURL(obj)} className="co-resource-item__resource-name">
-          {obj.name}
-        </Link>
-      </div>
-    </TableData>
-    <TableData className={tableRuleClasses[1]}>
-      <Severity severity={obj.labels?.severity} />
-    </TableData>
-    <TableData className={tableRuleClasses[2]}>
-      {_.isEmpty(obj.alerts) ? '-' : <StateCounts alerts={obj.alerts} />}
-    </TableData>
-    <TableData className={tableRuleClasses[3]}>
-      {alertingRuleSource(obj) === AlertSource.User
-        ? i18next.t('public~User')
-        : i18next.t('public~Platform')}
-    </TableData>
-  </>
-);
+const RuleTableRow: React.FC<RowProps<Rule>> = ({ obj }) => {
+  const { t } = useTranslation();
+
+  const title: string = obj.annotations?.description || obj.annotations?.message;
+
+  return (
+    <>
+      <td className={tableRuleClasses[0]} title={title}>
+        <div className="co-resource-item">
+          <MonitoringResourceIcon resource={RuleResource} />
+          <Link to={ruleURL(obj)} className="co-resource-item__resource-name">
+            {obj.name}
+          </Link>
+        </div>
+      </td>
+      <td className={tableRuleClasses[1]} title={title}>
+        <Severity severity={obj.labels?.severity} />
+      </td>
+      <td className={tableRuleClasses[2]} title={title}>
+        {_.isEmpty(obj.alerts) ? '-' : <StateCounts alerts={obj.alerts} />}
+      </td>
+      <td className={tableRuleClasses[3]} title={title}>
+        {alertingRuleSource(obj) === AlertSource.User ? t('public~User') : t('public~Platform')}
+      </td>
+    </>
+  );
+};
 
 const RulesPage_: React.FC<{}> = () => {
   const { t } = useTranslation();
 
-  const data = useSelector(({ observe }: RootState) => observe.get('rules'));
-  const { loaded, loadError }: Alerts = useSelector(
+  const data: Rule[] = useSelector(({ observe }: RootState) => observe.get('rules'));
+  const { loaded = false, loadError }: Alerts = useSelector(
     ({ observe }: RootState) => observe.get('alerts') || {},
   );
   const silencesLoadError = useSelector(
     ({ observe }: RootState) => observe.get('silences')?.loadError,
   );
 
-  const Header = () => [
-    {
-      title: t('public~Name'),
-      sortField: 'name',
-      transforms: [sortable],
-      props: { className: tableRuleClasses[0] },
-    },
-    {
-      title: t('public~Severity'),
-      sortFunc: 'alertSeverityOrder',
-      transforms: [sortable],
-      props: { className: tableRuleClasses[1] },
-    },
-    {
-      title: t('public~Alert state'),
-      sortFunc: 'alertingRuleStateOrder',
-      transforms: [sortable],
-      props: { className: tableRuleClasses[2] },
-    },
-    {
-      title: t('public~Source'),
-      sortFunc: 'alertingRuleSource',
-      transforms: [sortable],
-      props: { className: tableRuleClasses[3] },
-    },
-  ];
+  const nameFilter: RowFilter = {
+    filter: (filter, rule: Rule) => fuzzyCaseInsensitive(filter.selected?.[0], rule.name),
+    items: [],
+    type: 'name',
+  } as RowFilter;
 
-  const rulesRowFilters: RowFilter[] = [
+  const rowFilters: RowFilter[] = [
     alertStateFilter(),
     severityRowFilter(),
     {
       defaultSelected: [AlertSource.Platform],
+      filter: (filter, rule: Rule) =>
+        filter.selected?.includes(alertingRuleSource(rule)) || _.isEmpty(filter.selected),
       filterGroupName: t('public~Source'),
       items: [
         { id: AlertSource.Platform, title: t('public~Platform') },
@@ -1581,25 +1781,75 @@ const RulesPage_: React.FC<{}> = () => {
     },
   ];
 
+  const allFilters: RowFilter[] = [nameFilter, ...rowFilters];
+  const [staticData, filteredData, onFilterChange] = useListPageFilter(data, allFilters);
+
+  const columns = React.useMemo<TableColumn<Rule>[]>(
+    () => [
+      {
+        id: 'name',
+        props: { className: tableRuleClasses[0] },
+        sort: 'name',
+        title: t('public~Name'),
+        transforms: [sortable],
+      },
+      {
+        id: 'severity',
+        props: { className: tableRuleClasses[1] },
+        sort: (rules: Rule[], direction: 'asc' | 'desc') =>
+          _.orderBy(rules, alertSeverityOrder, [direction]) as Rule[],
+        title: t('public~Severity'),
+        transforms: [sortable],
+      },
+      {
+        id: 'state',
+        props: { className: tableRuleClasses[2] },
+        sort: (rules: Rule[], direction: 'asc' | 'desc') =>
+          _.orderBy(rules, alertingRuleStateOrder, [direction]),
+        title: t('public~Alert state'),
+        transforms: [sortable],
+      },
+      {
+        id: 'source',
+        props: { className: tableRuleClasses[3] },
+        sort: (rules: Rule[], direction: 'asc' | 'desc') =>
+          _.orderBy(rules, alertingRuleSource, [direction]),
+        title: t('public~Source'),
+        transforms: [sortable],
+      },
+    ],
+    [t],
+  );
+
   return (
-    <MonitoringListPage
-      data={data}
-      defaultSortField="name"
-      Header={Header}
-      kindPlural={t('public~Alerting rules')}
-      labelFilter="alerts"
-      labelPath="labels"
-      loaded={loaded}
-      loadError={loadError}
-      nameFilterID="alerting-rule-name"
-      reduxID="monitoringRules"
-      Row={RuleTableRow}
-      rowFilters={rulesRowFilters}
-      getRowProps={getRowProps}
-      TopAlert={
-        silencesLoadError && <SilencesNotLoadedWarning silencesLoadError={silencesLoadError} />
-      }
-    />
+    <>
+      <Helmet>
+        <title>Alerting</title>
+      </Helmet>
+      <div className="co-m-pane__body">
+        <ListPageFilter
+          data={staticData}
+          labelFilter="alerts"
+          loaded={loaded}
+          onFilterChange={onFilterChange}
+          rowFilters={rowFilters}
+        />
+        {silencesLoadError && <SilencesNotLoadedWarning silencesLoadError={silencesLoadError} />}
+        <div className="row">
+          <div className="col-xs-12">
+            <VirtualizedTable<Rule>
+              aria-label={t('public~Alerting rules')}
+              columns={columns}
+              data={filteredData ?? []}
+              loaded={loaded}
+              loadError={loadError}
+              Row={RuleTableRow}
+              unfilteredData={data}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 const RulesPage = withFallback(RulesPage_);
@@ -1616,45 +1866,112 @@ const CreateButton: React.FC<{}> = React.memo(() => {
   );
 });
 
+const silenceFiringAlertsOrder = (silence: Silence) => {
+  const counts = _.countBy(silence.firingAlerts, 'labels.severity');
+  return [
+    Number.MAX_SAFE_INTEGER - (counts[AlertSeverity.Critical] ?? 0),
+    Number.MAX_SAFE_INTEGER - (counts[AlertSeverity.Warning] ?? 0),
+    silence.firingAlerts.length,
+  ];
+};
+
+const silenceStateOrder = (silence: Silence) => [
+  [SilenceStates.Active, SilenceStates.Pending, SilenceStates.Expired].indexOf(
+    silenceState(silence),
+  ),
+  _.get(silence, silenceState(silence) === SilenceStates.Pending ? 'startsAt' : 'endsAt'),
+];
+
 const SilencesPage_: React.FC<Silences> = () => {
   const { t } = useTranslation();
 
-  const { data, loaded, loadError }: Silences = useSelector(
+  const { data, loaded = false, loadError }: Silences = useSelector(
     ({ observe }: RootState) => observe.get('silences') || {},
   );
 
-  const Header = () => getSilenceTableHeader(t);
+  const nameFilter: RowFilter = {
+    filter: (filter, silence: Silence) => fuzzyCaseInsensitive(filter.selected?.[0], silence.name),
+    items: [],
+    type: 'name',
+  } as RowFilter;
 
-  const silencesRowFilters: RowFilter[] = [
+  const rowFilters: RowFilter[] = [
     {
       defaultSelected: [SilenceStates.Active, SilenceStates.Pending],
-      type: 'silence-state',
+      filter: (filter, silence: Silence) =>
+        filter.selected?.includes(silenceState(silence)) || _.isEmpty(filter.selected),
       filterGroupName: t('public~Silence State'),
-      reducer: silenceState,
       items: [
         { id: SilenceStates.Active, title: t('public~Active') },
         { id: SilenceStates.Pending, title: t('public~Pending') },
         { id: SilenceStates.Expired, title: t('public~Expired') },
       ],
+      reducer: silenceState,
+      type: 'silence-state',
     },
   ];
 
+  const allFilters: RowFilter[] = [nameFilter, ...rowFilters];
+  const [staticData, filteredData, onFilterChange] = useListPageFilter(data, allFilters);
+
+  const columns = React.useMemo<TableColumn<Silence>[]>(
+    () => [
+      {
+        id: 'name',
+        props: { className: tableSilenceClasses[0] },
+        sort: 'name',
+        title: t('public~Name'),
+        transforms: [sortable],
+      },
+      {
+        id: 'firingAlerts',
+        props: { className: tableSilenceClasses[1] },
+        sort: (silences: Silence[], direction: 'asc' | 'desc') =>
+          _.orderBy(silences, silenceFiringAlertsOrder, [direction]),
+        title: t('public~Firing alerts'),
+        transforms: [sortable],
+      },
+      {
+        id: 'state',
+        props: { className: tableSilenceClasses[2] },
+        sort: (silences: Silence[], direction: 'asc' | 'desc') =>
+          _.orderBy(silences, silenceStateOrder, [direction]),
+        title: t('public~State'),
+        transforms: [sortable],
+      },
+      {
+        id: 'createdBy',
+        props: { className: tableSilenceClasses[3] },
+        sort: 'createdBy',
+        title: t('public~Creator'),
+        transforms: [sortable],
+      },
+      {
+        id: 'actions',
+        props: { className: tableSilenceClasses[4] },
+        title: '',
+      },
+    ],
+    [t],
+  );
+
   return (
-    <MonitoringListPage
-      CreateButton={CreateButton}
-      data={data}
-      defaultSortField="name"
-      Header={Header}
-      hideLabelFilter
-      kindPlural={t('public~Silences')}
-      loaded={loaded}
-      loadError={loadError}
-      nameFilterID="silence-name"
-      reduxID="monitoringSilences"
-      Row={SilenceTableRow}
-      rowFilters={silencesRowFilters}
-      TopAlert={
-        loadError && (
+    <>
+      <Helmet>
+        <title>Alerting</title>
+      </Helmet>
+      <div className="co-m-pane__body">
+        <div className="co-m-pane__createLink--no-title">
+          <CreateButton />
+        </div>
+        <ListPageFilter
+          data={staticData}
+          hideLabelFilter
+          loaded={loaded}
+          onFilterChange={onFilterChange}
+          rowFilters={rowFilters}
+        />
+        {loadError && (
           <PFAlert
             className="co-alert"
             isInline
@@ -1665,48 +1982,25 @@ const SilencesPage_: React.FC<Silences> = () => {
           >
             {typeof loadError === 'string' ? loadError : loadError.message}
           </PFAlert>
-        )
-      }
-    />
+        )}
+        <div className="row">
+          <div className="col-xs-12">
+            <VirtualizedTable<Silence>
+              aria-label={t('public~Silences')}
+              columns={columns}
+              data={filteredData ?? []}
+              loaded={loaded}
+              loadError={loadError}
+              Row={SilenceTableRow}
+              unfilteredData={data}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 const SilencesPage = withFallback(SilencesPage_);
-
-const AlertmanagerYAML = () => {
-  return (
-    <Firehose
-      resources={[
-        {
-          kind: 'Secret',
-          name: 'alertmanager-main',
-          namespace: 'openshift-monitoring',
-          isList: false,
-          prop: 'obj',
-        },
-      ]}
-    >
-      <AlertmanagerYAMLEditorWrapper />
-    </Firehose>
-  );
-};
-
-const AlertmanagerConfig = () => {
-  return (
-    <Firehose
-      resources={[
-        {
-          kind: 'Secret',
-          name: 'alertmanager-main',
-          namespace: 'openshift-monitoring',
-          isList: false,
-          prop: 'obj',
-        },
-      ]}
-    >
-      <AlertmanagerConfigWrapper />
-    </Firehose>
-  );
-};
 
 const Tab: React.FC<{ active: boolean; children: React.ReactNode }> = ({ active, children }) => (
   <li
@@ -1718,74 +2012,41 @@ const Tab: React.FC<{ active: boolean; children: React.ReactNode }> = ({ active,
   </li>
 );
 
-const AlertingPage: React.FC<{ match: any }> = ({ match }) => {
+const AlertingPage: React.FC<{ match: { url: string } }> = ({ match }) => {
   const { t } = useTranslation();
 
   const alertsPath = '/monitoring/alerts';
   const rulesPath = '/monitoring/alertrules';
   const silencesPath = '/monitoring/silences';
-  const configPath = '/monitoring/alertmanagerconfig';
-  const YAMLPath = '/monitoring/alertmanageryaml';
 
   const { url } = match;
-  const isAlertmanager = url === configPath || url === YAMLPath;
 
   return (
     <>
-      {isAlertmanager && (
-        <div className="pf-c-page__main-breadcrumb">
-          <BreadCrumbs
-            breadcrumbs={breadcrumbsForGlobalConfig(
-              'Alertmanager',
-              '/monitoring/alertmanagerconfig',
-            )}
-          />
-        </div>
-      )}
-      <div
-        className={classNames('co-m-nav-title', 'co-m-nav-title--detail', {
-          'co-m-nav-title--breadcrumbs': isAlertmanager,
-        })}
-      >
+      <div className="co-m-nav-title co-m-nav-title--detail">
         <h1 className="co-m-pane__heading">
           <div className="co-m-pane__name co-resource-item">
             <span className="co-resource-item__resource-name" data-test-id="resource-title">
-              {isAlertmanager ? t('public~Alertmanager') : t('public~Alerting')}
+              {t('public~Alerting')}
             </span>
           </div>
         </h1>
       </div>
       <ul className="co-m-horizontal-nav__menu">
-        {(url === alertsPath || url === rulesPath || url === silencesPath) && (
-          <>
-            <Tab active={url === alertsPath}>
-              <Link to={alertsPath}>{t('public~Alerts')}</Link>
-            </Tab>
-            <Tab active={url === silencesPath}>
-              <Link to={silencesPath}>{t('public~Silences')}</Link>
-            </Tab>
-            <Tab active={url === rulesPath}>
-              <Link to={rulesPath}>{t('public~Alerting rules')}</Link>
-            </Tab>
-          </>
-        )}
-        {isAlertmanager && (
-          <>
-            <Tab active={url === configPath}>
-              <Link to={configPath}>{t('public~Details')}</Link>
-            </Tab>
-            <Tab active={url === YAMLPath}>
-              <Link to={YAMLPath}>{t('public~YAML')}</Link>
-            </Tab>
-          </>
-        )}
+        <Tab active={url === alertsPath}>
+          <Link to={alertsPath}>{t('public~Alerts')}</Link>
+        </Tab>
+        <Tab active={url === silencesPath}>
+          <Link to={silencesPath}>{t('public~Silences')}</Link>
+        </Tab>
+        <Tab active={url === rulesPath}>
+          <Link to={rulesPath}>{t('public~Alerting rules')}</Link>
+        </Tab>
       </ul>
       <Switch>
         <Route path={alertsPath} exact component={AlertsPage} />
         <Route path={rulesPath} exact component={RulesPage} />
         <Route path={silencesPath} exact component={SilencesPage} />
-        <Route path={configPath} exact component={AlertmanagerConfig} />
-        <Route path={YAMLPath} exact component={AlertmanagerYAML} />
       </Switch>
     </>
   );
@@ -1803,7 +2064,7 @@ const PollerPages = () => {
       dispatch(alertingLoading(alertsKey));
       const url = getPrometheusURL({ endpoint: PrometheusEndpoint.RULES });
       const poller = (): void => {
-        coFetchJSON(url)
+        consoleFetchJSON(url)
           .then(({ data }) => {
             const { alerts, rules } = getAlertsAndRules(data);
             dispatch(alertingLoaded(alertsKey, alerts));
@@ -1822,11 +2083,7 @@ const PollerPages = () => {
 
   return (
     <Switch>
-      <Route
-        path="/monitoring/(alertmanageryaml|alerts|alertrules|silences|alertmanagerconfig)"
-        exact
-        component={AlertingPage}
-      />
+      <Route path="/monitoring/(alerts|alertrules|silences)" exact component={AlertingPage} />
       <Route path="/monitoring/alertrules/:id" exact component={AlertRulesDetailsPage} />
       <Route path="/monitoring/alerts/:ruleID" exact component={AlertsDetailsPage} />
       <Route path="/monitoring/silences/:id" exact component={SilencesDetailsPage} />
@@ -1848,6 +2105,8 @@ export const MonitoringUI = () => (
     {/* This redirect also handles the `/monitoring/#/alerts?...` link URLs generated by
     Alertmanager (because the `#` is considered the end of the URL) */}
     <Redirect from="/monitoring" exact to="/monitoring/alerts" />
+    <Route path="/monitoring/alertmanagerconfig" exact component={AlertmanagerPage} />
+    <Route path="/monitoring/alertmanageryaml" exact component={AlertmanagerPage} />
     <Route path="/monitoring/dashboards/:board?" exact component={MonitoringDashboardsPage} />
     <Route path="/monitoring/graph" exact component={PrometheusUIRedirect} />
     <Route path="/monitoring/query-browser" exact component={QueryBrowserPage} />
@@ -1879,4 +2138,13 @@ type GraphProps = {
 type MonitoringResourceIconProps = {
   className?: string;
   resource: MonitoringResource;
+};
+
+type OnToggle = (value: boolean, e: MouseEvent) => void;
+
+type SilenceDropdownProps = {
+  className?: string;
+  isPlain?: boolean;
+  silence: Silence;
+  Toggle: React.FC<{ onToggle: OnToggle }>;
 };

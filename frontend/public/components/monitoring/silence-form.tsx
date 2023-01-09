@@ -1,5 +1,20 @@
 import * as _ from 'lodash-es';
-import { Alert, ActionGroup, Button, TextArea, TextInput, Tooltip } from '@patternfly/react-core';
+import { getUser, Silence, SilenceStates } from '@console/dynamic-plugin-sdk';
+import {
+  formatPrometheusDuration,
+  parsePrometheusDuration,
+} from '@openshift-console/plugin-shared/src/datetime/prometheus';
+import {
+  Alert,
+  ActionGroup,
+  Button,
+  Dropdown,
+  DropdownItem,
+  DropdownToggle,
+  TextArea,
+  TextInput,
+  Tooltip,
+} from '@patternfly/react-core';
 import { MinusCircleIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import * as React from 'react';
 import { Helmet } from 'react-helmet';
@@ -7,20 +22,18 @@ import { Trans, useTranslation } from 'react-i18next';
 // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
 // @ts-ignore
 import { useSelector } from 'react-redux';
-import { getUser } from '@console/dynamic-plugin-sdk';
 
+import { consoleFetchJSON } from '@console/dynamic-plugin-sdk/src/utils/fetch';
 import { withFallback } from '@console/shared/src/components/error';
-import { coFetchJSON } from '../../co-fetch';
 import { RootState } from '../../redux';
 import { refreshNotificationPollers } from '../notification-drawer';
 import { ButtonBar } from '../utils/button-bar';
-import { formatPrometheusDuration, parsePrometheusDuration } from '../utils/datetime';
-import { Dropdown } from '../utils/dropdown';
 import { PageHeading, SectionHeading } from '../utils/headings';
 import { ExternalLink, getURLSearchParams } from '../utils/link';
 import { history } from '../utils/router';
 import { StatusBox } from '../utils/status-box';
-import { Silence, Silences, SilenceStates } from './types';
+import { useBoolean } from './hooks/useBoolean';
+import { Silences } from './types';
 import { SilenceResource, silenceState } from './utils';
 
 const pad = (i: number): string => (i < 10 ? `0${i}` : String(i));
@@ -49,7 +62,7 @@ const DatetimeTextInput = (props) => {
         <TextInput
           {...props}
           aria-label={t('public~Datetime')}
-          data-test-id="datetime"
+          data-test-id="silence-datetime"
           validated={isValid || !!props.isDisabled ? 'default' : 'error'}
           pattern={pattern}
           placeholder="YYYY/MM/DD hh:mm:ss"
@@ -59,23 +72,38 @@ const DatetimeTextInput = (props) => {
   );
 };
 
+const NegativeMatcherHelp = () => {
+  const { t } = useTranslation();
+
+  return (
+    <dl>
+      <dd>
+        {t('Select the negative matcher option to update the label value to a not equals matcher.')}
+      </dd>
+      <dd>
+        {t(
+          'If both the RegEx and negative matcher options are selected, the label value must not match the regular expression.',
+        )}
+      </dd>
+    </dl>
+  );
+};
+
 const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => {
   const { t } = useTranslation();
 
   const durationOff = '-';
-  const durations = [durationOff, '30m', '1h', '2h', '6h', '12h', '1d', '2d', '1w'];
-  const internationalizedDurationItems = [
-    durationOff,
-    t('public~30m'),
-    t('public~1h'),
-    t('public~2h'),
-    t('public~6h'),
-    t('public~12h'),
-    t('public~1d'),
-    t('public~2d'),
-    t('public~1w'),
-  ];
-  const durationItems = _.zipObject(durations, internationalizedDurationItems);
+  const durations = {
+    [durationOff]: durationOff,
+    '30m': t('public~30m'),
+    '1h': t('public~1h'),
+    '2h': t('public~2h'),
+    '6h': t('public~6h'),
+    '12h': t('public~12h'),
+    '1d': t('public~1d'),
+    '2d': t('public~2d'),
+    '1w': t('public~1w'),
+  };
 
   const now = new Date();
 
@@ -91,10 +119,12 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
     const durationFromDefaults = formatPrometheusDuration(
       Date.parse(defaults.endsAt) - Date.parse(defaults.startsAt),
     );
-    if (durations.includes(durationFromDefaults)) {
+    if (Object.keys(durations).includes(durationFromDefaults)) {
       defaultDuration = durationFromDefaults;
     }
   }
+
+  const [isOpen, setIsOpen, , setClosed] = useBoolean(false);
 
   const [comment, setComment] = React.useState(defaults.comment ?? '');
   const [createdBy, setCreatedBy] = React.useState(defaults.createdBy ?? '');
@@ -176,7 +206,7 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
       startsAt: saveStartsAt.toISOString(),
     };
 
-    coFetchJSON
+    consoleFetchJSON
       .post(`${alertManagerBaseURL}/api/v2/silences`, body)
       .then(({ silenceID }) => {
         setError(undefined);
@@ -188,6 +218,12 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
         setInProgress(false);
       });
   };
+
+  const dropdownItems = _.map(durations, (displayText, key) => (
+    <DropdownItem key={key} onClick={() => setDuration(key)}>
+      {displayText}
+    </DropdownItem>
+  ));
 
   return (
     <>
@@ -212,10 +248,10 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
               <div className="form-group col-sm-4 col-md-5">
                 <label>{t('public~Silence alert from...')}</label>
                 {isStartNow ? (
-                  <DatetimeTextInput isDisabled data-test="from" value={t('public~Now')} />
+                  <DatetimeTextInput isDisabled data-test="silence-from" value={t('public~Now')} />
                 ) : (
                   <DatetimeTextInput
-                    data-test="from"
+                    data-test="silence-from"
                     isRequired
                     onChange={(v: string) => setStartsAt(v)}
                     value={startsAt}
@@ -225,28 +261,34 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
               <div className="form-group col-sm-4 col-md-2">
                 <label>{t('public~For...')}</label>
                 <Dropdown
-                  dropDownClassName="dropdown--full-width"
-                  items={durationItems}
-                  onChange={(v: string) => setDuration(v)}
-                  selectedKey={duration}
+                  className="dropdown--full-width"
+                  data-test="silence-for"
+                  dropdownItems={dropdownItems}
+                  isOpen={isOpen}
+                  onSelect={setClosed}
+                  toggle={
+                    <DropdownToggle data-test="silence-for-toggle" onToggle={setIsOpen}>
+                      {duration}
+                    </DropdownToggle>
+                  }
                 />
               </div>
               <div className="form-group col-sm-4 col-md-5">
                 <label>{t('public~Until...')}</label>
                 {duration === durationOff ? (
                   <DatetimeTextInput
-                    data-test="until"
+                    data-test="silence-until"
                     isRequired
                     onChange={(v: string) => setEndsAt(v)}
                     value={endsAt}
                   />
                 ) : (
                   <DatetimeTextInput
-                    data-test="until"
+                    data-test="silence-until"
                     isDisabled
                     value={
                       isStartNow
-                        ? t('public~{{duration}} from now', { duration: durationItems[duration] })
+                        ? t('public~{{duration}} from now', { duration: durations[duration] })
                         : getEndsAtValue()
                     }
                   />
@@ -256,7 +298,7 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
             <div className="form-group">
               <label>
                 <input
-                  data-test="start-immediately"
+                  data-test="silence-start-immediately"
                   checked={isStartNow}
                   onChange={(e) => setIsStartNow(e.currentTarget.checked)}
                   type="checkbox"
@@ -305,12 +347,22 @@ const SilenceForm_: React.FC<SilenceFormProps> = ({ defaults, Info, title }) => 
                   <div className="monitoring-silence-alert__label-options">
                     <label>
                       <input
-                        type="checkbox"
-                        onChange={(e) => setMatcherField(i, 'isRegex', e.currentTarget.checked)}
                         checked={matcher.isRegex}
+                        onChange={(e) => setMatcherField(i, 'isRegex', e.currentTarget.checked)}
+                        type="checkbox"
                       />
-                      &nbsp; {t('public~Use RegEx')}
+                      &nbsp; {t('public~RegEx')}
                     </label>
+                    <Tooltip content={<NegativeMatcherHelp />}>
+                      <label>
+                        <input
+                          checked={matcher.isEqual === false}
+                          onChange={(e) => setMatcherField(i, 'isEqual', !e.currentTarget.checked)}
+                          type="checkbox"
+                        />
+                        &nbsp; {t('public~Negative matcher')}
+                      </label>
+                    </Tooltip>
                     <Tooltip content={t('public~Remove')}>
                       <Button
                         type="button"

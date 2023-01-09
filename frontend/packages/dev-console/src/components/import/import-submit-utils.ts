@@ -37,6 +37,7 @@ import {
 import { PIPELINE_SERVICE_ACCOUNT } from '@console/pipelines-plugin/src/components/pipelines/const';
 import { createTrigger } from '@console/pipelines-plugin/src/components/pipelines/modals/triggers/submit-utils';
 import { setPipelineNotStarted } from '@console/pipelines-plugin/src/components/pipelines/pipeline-overview/pipeline-overview-utils';
+import { createRepositoryResources } from '@console/pipelines-plugin/src/components/repository/repository-form-utils';
 import { PipelineKind } from '@console/pipelines-plugin/src/types';
 import {
   updateServiceAccount,
@@ -326,7 +327,6 @@ export const createOrUpdateDeployment = (
     limits: { cpu, memory },
     git: { url: repository, ref },
     healthChecks,
-    resources,
   } = formData;
 
   const imageStreamName = imageStream && imageStream.metadata.name;
@@ -339,7 +339,7 @@ export const createOrUpdateDeployment = (
     'alpha.image.policy.openshift.io/resolve-names': '*',
     ...getTriggerAnnotation(name, imageName, namespace, imageChange),
   };
-  const podLabels = getPodLabels(resources, name);
+  const podLabels = getPodLabels(Resources.Kubernetes, name);
   const templateLabels = getTemplateLabels(originalDeployment);
 
   const newDeployment = {
@@ -401,7 +401,6 @@ export const createOrUpdateDeploymentConfig = (
     limits: { cpu, memory },
     git: { url: repository, ref },
     healthChecks,
-    resources,
   } = formData;
 
   const imageStreamName = imageStream && imageStream.metadata.name;
@@ -411,7 +410,7 @@ export const createOrUpdateDeploymentConfig = (
     ...getGitAnnotations(repository, ref),
     ...getRouteAnnotations(),
   };
-  const podLabels = getPodLabels(resources, name);
+  const podLabels = getPodLabels(Resources.OpenShift, name);
   const templateLabels = getTemplateLabels(originalDeploymentConfig);
 
   const newDeploymentConfig = {
@@ -564,6 +563,9 @@ export const createDevfileResources = async (
     devfileSuggestedResources,
   ).reduce((acc: DevfileSuggestedResources, resourceType: string) => {
     const resource: K8sResourceKind = devfileSuggestedResources[resourceType];
+    if (!resource) {
+      return acc;
+    }
     return {
       ...acc,
       [resourceType]: {
@@ -617,26 +619,33 @@ export const createDevfileResources = async (
     verb,
   );
 
-  const serviceModelResponse = await k8sCreate(
-    ServiceModel,
-    createService(formData, devfileResourceObjects.imageStream, devfileResourceObjects.service),
-    dryRun ? dryRunOpt : {},
-  );
+  const serviceModelResponse =
+    devfileResourceObjects.service &&
+    (await k8sCreate(
+      ServiceModel,
+      createService(formData, devfileResourceObjects.imageStream, devfileResourceObjects.service),
+      dryRun ? dryRunOpt : {},
+    ));
 
-  const routeResponse = await k8sCreate(
-    RouteModel,
-    createRoute(formData, devfileResourceObjects.imageStream, devfileResourceObjects.route),
-    dryRun ? dryRunOpt : {},
-  );
+  const routeResponse =
+    devfileResourceObjects.route &&
+    (await k8sCreate(
+      RouteModel,
+      createRoute(formData, devfileResourceObjects.imageStream, devfileResourceObjects.route),
+      dryRun ? dryRunOpt : {},
+    ));
 
-  return [
+  const devfileResources = [
     imageStreamResponse,
     buildConfigResponse,
     webhookSecretResponse,
     deploymentResponse,
-    serviceModelResponse,
-    routeResponse,
   ];
+
+  serviceModelResponse && devfileResources.push(serviceModelResponse);
+  routeResponse && devfileResources.push(routeResponse);
+
+  return devfileResources;
 };
 
 export const createOrUpdateResources = async (
@@ -661,6 +670,7 @@ export const createOrUpdateResources = async (
       triggers: { image: imageChange },
     },
     git: { url: repository, type: gitType, ref },
+    pac: { repository: pacRepository },
     pipeline,
     resources,
   } = formData;
@@ -686,6 +696,12 @@ export const createOrUpdateResources = async (
       throw new Error(t('devconsole~Cannot update Devfile resources'));
     }
     return createDevfileResources(formData, dryRun, appResources, generatedImageStreamName);
+  }
+
+  if (buildStrategy === BuildStrategyType.Pac) {
+    const repo = await createRepositoryResources(pacRepository, namespace, dryRun);
+    responses.push(repo);
+    return responses;
   }
 
   const imageStreamResponse = await createOrUpdateImageStream(

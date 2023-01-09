@@ -15,8 +15,8 @@
 13.  [`console.cluster-overview/utilization-item`](#consolecluster-overviewutilization-item)
 14.  [`console.context-provider`](#consolecontext-provider)
 15.  [`console.dashboards/card`](#consoledashboardscard)
-16.  [`console.dashboards/overview/activity/resource`](#consoledashboardsoverviewactivityresource)
-17.  [`console.dashboards/overview/detail/item`](#consoledashboardsoverviewdetailitem)
+16.  [`console.dashboards/custom/overview/detail/item`](#consoledashboardscustomoverviewdetailitem)
+17.  [`console.dashboards/overview/activity/resource`](#consoledashboardsoverviewactivityresource)
 18.  [`console.dashboards/overview/health/operator`](#consoledashboardsoverviewhealthoperator)
 19.  [`console.dashboards/overview/health/prometheus`](#consoledashboardsoverviewhealthprometheus)
 20.  [`console.dashboards/overview/health/resource`](#consoledashboardsoverviewhealthresource)
@@ -51,29 +51,32 @@
 49.  [`console.pvc/status`](#consolepvcstatus)
 50.  [`console.redux-reducer`](#consoleredux-reducer)
 51.  [`console.resource/create`](#consoleresourcecreate)
-52.  [`console.storage-provider`](#consolestorage-provider)
-53.  [`console.tab/horizontalNav`](#consoletabhorizontalNav)
-54.  [`console.telemetry/listener`](#consoletelemetrylistener)
-55.  [`console.topology/adapter/build`](#consoletopologyadapterbuild)
-56.  [`console.topology/adapter/network`](#consoletopologyadapternetwork)
-57.  [`console.topology/adapter/pod`](#consoletopologyadapterpod)
-58.  [`console.topology/component/factory`](#consoletopologycomponentfactory)
-59.  [`console.topology/create/connector`](#consoletopologycreateconnector)
-60.  [`console.topology/data/factory`](#consoletopologydatafactory)
-61.  [`console.topology/decorator/provider`](#consoletopologydecoratorprovider)
-62.  [`console.topology/details/resource-alert`](#consoletopologydetailsresource-alert)
-63.  [`console.topology/details/resource-link`](#consoletopologydetailsresource-link)
-64.  [`console.topology/details/tab`](#consoletopologydetailstab)
-65.  [`console.topology/details/tab-section`](#consoletopologydetailstab-section)
-66.  [`console.topology/display/filters`](#consoletopologydisplayfilters)
-67.  [`console.topology/relationship/provider`](#consoletopologyrelationshipprovider)
-68.  [`console.user-preference/group`](#consoleuser-preferencegroup)
-69.  [`console.user-preference/item`](#consoleuser-preferenceitem)
-70.  [`console.yaml-template`](#consoleyaml-template)
-71.  [`dev-console.add/action`](#dev-consoleaddaction)
-72.  [`dev-console.add/action-group`](#dev-consoleaddaction-group)
-73.  [`dev-console.import/environment`](#dev-consoleimportenvironment)
-74. [DEPRECATED] [`console.page/resource/tab`](#consolepageresourcetab)
+52.  [`console.storage-class/provisioner`](#consolestorage-classprovisioner)
+53.  [`console.storage-provider`](#consolestorage-provider)
+54.  [`console.tab`](#consoletab)
+55.  [`console.tab/horizontalNav`](#consoletabhorizontalNav)
+56.  [`console.telemetry/listener`](#consoletelemetrylistener)
+57.  [`console.topology/adapter/build`](#consoletopologyadapterbuild)
+58.  [`console.topology/adapter/network`](#consoletopologyadapternetwork)
+59.  [`console.topology/adapter/pod`](#consoletopologyadapterpod)
+60.  [`console.topology/component/factory`](#consoletopologycomponentfactory)
+61.  [`console.topology/create/connector`](#consoletopologycreateconnector)
+62.  [`console.topology/data/factory`](#consoletopologydatafactory)
+63.  [`console.topology/decorator/provider`](#consoletopologydecoratorprovider)
+64.  [`console.topology/details/resource-alert`](#consoletopologydetailsresource-alert)
+65.  [`console.topology/details/resource-link`](#consoletopologydetailsresource-link)
+66.  [`console.topology/details/tab`](#consoletopologydetailstab)
+67.  [`console.topology/details/tab-section`](#consoletopologydetailstab-section)
+68.  [`console.topology/display/filters`](#consoletopologydisplayfilters)
+69.  [`console.topology/relationship/provider`](#consoletopologyrelationshipprovider)
+70.  [`console.user-preference/group`](#consoleuser-preferencegroup)
+71.  [`console.user-preference/item`](#consoleuser-preferenceitem)
+72.  [`console.yaml-template`](#consoleyaml-template)
+73.  [`dev-console.add/action`](#dev-consoleaddaction)
+74.  [`dev-console.add/action-group`](#dev-consoleaddaction-group)
+75.  [`dev-console.import/environment`](#dev-consoleimportenvironment)
+76. [DEPRECATED] [`console.dashboards/overview/detail/item`](#consoledashboardsoverviewdetailitem)
+77. [DEPRECATED] [`console.page/resource/tab`](#consolepageresourcetab)
 
 ---
 
@@ -152,7 +155,7 @@ ResourceActionProvider contributes a hook that returns list of actions for speci
 | ---- | ---------- | -------- | ----------- |
 | `alert` | `string` | no |  |
 | `text` | `string` | no |  |
-| `action` | `CodeRef<(alert: any) => void>` | no |  |
+| `action` | `CodeRef<(alert: Alert, launchModal: LaunchModal) => void>` | no |  |
 
 ---
 
@@ -324,6 +327,24 @@ Adds a new dashboard card.
 
 ---
 
+## `console.dashboards/custom/overview/detail/item`
+
+### Summary 
+
+Adds an item to the Details card of Overview Dashboard
+
+### Properties
+
+| Name | Value Type | Optional | Description |
+| ---- | ---------- | -------- | ----------- |
+| `title` | `string` | no |  |
+| `component` | `CodeRef<React.ComponentType<{}>>` | no | The value, rendered by the OverviewDetailItem component |
+| `valueClassName` | `string` | yes |  |
+| `isLoading` | `CodeRef<() => boolean>` | yes | Function returning the loading state of the component |
+| `error` | `CodeRef<() => string>` | yes | Function returning errors to be displayed by the component |
+
+---
+
 ## `console.dashboards/overview/activity/resource`
 
 ### Summary 
@@ -338,20 +359,6 @@ Adds an activity to the Activity Card of Overview Dashboard where the triggering
 | `component` | `CodeRef<React.ComponentType<K8sActivityProps<T>>>` | no | The action component. |
 | `isActivity` | `CodeRef<(resource: T) => boolean>` | yes | Function which determines if the given resource represents the action. If not defined, every resource represents activity. |
 | `getTimestamp` | `CodeRef<(resource: T) => Date>` | yes | Timestamp for the given action, which will be used for ordering. |
-
----
-
-## `console.dashboards/overview/detail/item`
-
-### Summary 
-
-Adds an item to the Details card of Overview Dashboard
-
-### Properties
-
-| Name | Value Type | Optional | Description |
-| ---- | ---------- | -------- | ----------- |
-| `component` | `CodeRef<React.ComponentType<{}>>` | no | The value, based on the DetailItem component |
 
 ---
 
@@ -389,6 +396,8 @@ Adds a health subsystem to the status card of Overview dashboard where the sourc
 | `additionalResource` | `CodeRef<FirehoseResource>` | yes | Additional resource which will be fetched and passed to `healthHandler`. |
 | `popupComponent` | `CodeRef<React.ComponentType<PrometheusHealthPopupProps>>` | yes | Loader for popup content. If defined, a health item will be represented as a link which opens popup with given content. |
 | `popupTitle` | `string` | yes | The title of the popover. |
+| `popupClassname` | `string` | yes | Optional classname for the popup top-level component. |
+| `popupKeepOnOutsideClick` | `boolean` | yes | If true, the popup will stay open when clicked outside of its boundary. Default: false |
 | `disallowedControlPlaneTopology` | `string[]` | yes | Control plane topology for which the subsystem should be hidden. |
 
 ---
@@ -934,6 +943,21 @@ Adds new reducer to Console Redux store which operates on `plugins.<scope>` subs
 
 ---
 
+## `console.storage-class/provisioner`
+
+### Summary 
+
+Adds a new storage class provisioner as an option during storage class creation.
+
+### Properties
+
+| Name | Value Type | Optional | Description |
+| ---- | ---------- | -------- | ----------- |
+| `CSI` | `ProvisionerDetails` | yes |  |
+| `OTHERS` | `ProvisionerDetails` | yes |  |
+
+---
+
 ## `console.storage-provider`
 
 ### Summary 
@@ -946,6 +970,23 @@ Adds new reducer to Console Redux store which operates on `plugins.<scope>` subs
 | ---- | ---------- | -------- | ----------- |
 | `name` | `string` | no |  |
 | `Component` | `CodeRef<React.ComponentType<Partial<RouteComponentProps<{}, StaticContext, any>>>>` | no |  |
+
+---
+
+## `console.tab`
+
+### Summary 
+
+Adds a tab to a horizontal nav matching the `contextId`.
+
+### Properties
+
+| Name | Value Type | Optional | Description |
+| ---- | ---------- | -------- | ----------- |
+| `contextId` | `string` | no | Context ID assigned to the horizontal nav in which the tab will be injected.<br/>Possible values:<br/>- `dev-console-observe` |
+| `name` | `string` | no | The display label of the tab |
+| `href` | `string` | no | The href appended to the existing URL |
+| `component` | `CodeRef<React.ComponentType<PageComponentProps<K8sResourceCommon>>>` | no | Tab content component. |
 
 ---
 
@@ -1195,9 +1236,9 @@ Topology relationship provider connector extension
 | Name | Value Type | Optional | Description |
 | ---- | ---------- | -------- | ----------- |
 | `id` | `string` | no | ID used to identify the user preference group. |
-| `label` | `string` | no | The label of the user preference group |
-| `insertBefore` | `string` | yes | ID of user preference group before which this group should be placed |
-| `insertAfter` | `string` | yes | ID of user preference group after which this group should be placed |
+| `label` | `string` | no | The label of the user preference group. |
+| `insertBefore` | `string` | yes | ID of user preference group before which this group should be placed. |
+| `insertAfter` | `string` | yes | ID of user preference group after which this group should be placed. |
 
 ---
 
@@ -1212,12 +1253,12 @@ Topology relationship provider connector extension
 | Name | Value Type | Optional | Description |
 | ---- | ---------- | -------- | ----------- |
 | `id` | `string` | no | ID used to identify the user preference item and referenced in insertAfter and insertBefore to define the item order. |
-| `label` | `string` | no | The label of the user preference |
+| `groupId` | `string` | no | IDs used to identify the user preference groups the item would belong to. |
+| `label` | `string` | no | The label of the user preference. |
 | `description` | `string` | no | The description of the user preference. |
 | `field` | `UserPreferenceField` | no | The input field options used to render the values to set the user preference. |
-| `groupId` | `string` | yes | IDs used to identify the user preference groups the item would belong to. |
-| `insertBefore` | `string` | yes | ID of user preference item before which this item should be placed |
-| `insertAfter` | `string` | yes | ID of user preference item after which this item should be placed |
+| `insertBefore` | `string` | yes | ID of user preference item before which this item should be placed. |
+| `insertAfter` | `string` | yes | ID of user preference item after which this item should be placed. |
 
 ---
 
@@ -1250,8 +1291,9 @@ YAML templates for editing resources via the yaml editor.
 | `id` | `string` | no | ID used to identify the action. |
 | `label` | `string` | no | The label of the action |
 | `description` | `string` | no | The description of the action. |
-| `href` | `string` | no | The href to navigate to. |
 | `groupId` | `string` | yes | IDs used to identify the action groups the action would belong to. |
+| `href` | `string` | yes | The href to navigate to. |
+| `callback` | `CodeRef<(props: Record<string, any>) => void>` | yes | A callback that performs an action on click |
 | `icon` | `CodeRef<React.ReactNode>` | yes | The perspective display icon. |
 | `accessReview` | `AccessReviewResourceAttributes[]` | yes | Optional access review to control visibility / enablement of the action. |
 
@@ -1287,6 +1329,20 @@ YAML templates for editing resources via the yaml editor.
 | `imageStreamName` | `string` | no | Name of the image stream to provide custom environment variables for |
 | `imageStreamTags` | `string[]` | no | List of supported image stream tags |
 | `environments` | `ImageEnvironment[]` | no | List of environment variables |
+
+---
+
+## `console.dashboards/overview/detail/item`
+
+### Summary [DEPRECATED]
+
+@deprecated use CustomOverviewDetailItem type instead
+
+### Properties
+
+| Name | Value Type | Optional | Description |
+| ---- | ---------- | -------- | ----------- |
+| `component` | `CodeRef<React.ComponentType<{}>>` | no | The value, based on the DetailItem component |
 
 ---
 

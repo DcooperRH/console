@@ -150,6 +150,8 @@ When(
 );
 
 Then('user will see workload disappeared from topology', () => {
+  navigateTo(devNavigationMenu.Add);
+  navigateTo(devNavigationMenu.Topology);
   cy.get(topologyPO.emptyStateIcon).should('be.visible');
 });
 
@@ -167,6 +169,7 @@ When('user clicks Start building your application', () => {
 
 When('user enters {string} builder image in Quick Search bar', (searchItem: string) => {
   cy.get(topologyPO.quickSearch).type(searchItem);
+  cy.byTestID('item-name-.NET-Builder Images').click();
 });
 
 When('user clicks Create application on Quick Search Dialog', () => {
@@ -199,10 +202,18 @@ When('user enters Name as {string}', (name: string) => {
   gitPage.enterWorkloadName(name);
 });
 
+When('user selects {string} in Resource type section', (resourceType: string) => {
+  gitPage.selectResource(resourceType);
+});
+
 Given('user has installed Gitops primer Operator', () => {
   verifyAndInstallGitopsPrimerOperator();
 });
 
 Given('user has installed OpenShift Pipelines Operator', () => {
   verifyAndInstallPipelinesOperator();
+});
+
+When('user selects Resource as deployment', () => {
+  cy.byTestID('kubernetes-view-input').click();
 });

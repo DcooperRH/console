@@ -1,5 +1,6 @@
 import { guidedTour } from '@console/cypress-integration-tests/views/guided-tour';
 import {
+  devNavigationMenu,
   displayOptions,
   nodeActions,
   sideBarTabs,
@@ -9,6 +10,7 @@ import {
   createHelmRelease,
   app,
   createForm,
+  navigateTo,
 } from '@console/dev-console/integration-tests/support/pages';
 import { gitPage } from '@console/dev-console/integration-tests/support/pages/add-flow';
 import { topologyHelper } from './topology-helper-page';
@@ -68,8 +70,8 @@ export const topologyPage = {
   verifyWorkloadInTopologyPage: (appName: string) => {
     topologyHelper.verifyWorkloadInTopologyPage(appName);
   },
-  verifyWorkloadNotInTopologyPage: (appName: string) => {
-    topologyHelper.search(appName).should('not.exist');
+  verifyWorkloadNotInTopologyPage: (appName: string, options?: { timeout: number }) => {
+    topologyHelper.verifyWorkloadDeleted(appName, options);
   },
   clickDisplayOptionDropdown: () =>
     cy
@@ -90,6 +92,63 @@ export const topologyPage = {
     cy.get(topologyPO.graph.displayOptions.applicationGroupings).should('be.disabled'),
   uncheckExpandToggle: () => {
     cy.get(topologyPO.graph.displayOptions.expandSwitchToggle).click({ force: true });
+  },
+  defaultState: () => {
+    // By Default: Graph View
+    topologyPage.verifyTopologyGraphView();
+
+    // eslint-disable-next-line promise/catch-or-return
+    cy.get('body').then((el) => {
+      if (el.find(topologyPO.displayFilter.applicationGroupingOption).length === 0) {
+        cy.get(topologyPO.displayFilter.display).click();
+      }
+    });
+
+    // By Default: Expand Enabled
+    // eslint-disable-next-line promise/catch-or-return
+    cy.get(topologyPO.displayFilter.expandOption)
+      .as('radiobutton')
+      .invoke('is', ':checked')
+      .then((initial) => {
+        if (!initial) {
+          cy.get('@radiobutton').check({ force: true });
+        }
+      });
+
+    // By Default: ApplicationGroupings Checked
+    // eslint-disable-next-line promise/catch-or-return
+    cy.get(topologyPO.displayFilter.applicationGroupingOption)
+      .as('checkbox')
+      .invoke('is', ':checked')
+      .then((initial) => {
+        if (!initial) {
+          cy.get('@checkbox').check({ force: true });
+        }
+      });
+
+    // By Default: PodCount Unchecked
+    // eslint-disable-next-line promise/catch-or-return
+    cy.get(topologyPO.displayFilter.podLabelOptions)
+      .eq(2)
+      .as('checkbox')
+      .invoke('is', ':checked')
+      .then((initial) => {
+        if (initial) {
+          cy.get('@checkbox').uncheck({ force: true });
+        }
+      });
+
+    // By Default: Labels Checked
+    // eslint-disable-next-line promise/catch-or-return
+    cy.get(topologyPO.displayFilter.podLabelOptions)
+      .eq(3)
+      .as('checkbox')
+      .invoke('is', ':checked')
+      .then((initial) => {
+        if (!initial) {
+          cy.get('@checkbox').check({ force: true });
+        }
+      });
   },
   verifyPodCountUnchecked: () => cy.get(topologyPO.sidePane.showPodCount).should('not.be.checked'),
   selectDisplayOption: (opt: displayOptions) => {
@@ -167,6 +226,12 @@ export const topologyPage = {
   componentNode: (nodeName: string) => {
     return cy.get('g.pf-topology__node__label > text').contains(nodeName);
   },
+  componentNodeClick: (nodeName: string, options?: { timeout: number }) => {
+    topologyHelper.search(nodeName);
+    cy.get('[data-type="workload"] .is-filtered [data-test-id="base-node-handler"]', options)
+      .first()
+      .click({ force: true });
+  },
   knativeNode: (nodeName: string) => {
     return cy.get('g.odc-knative-service__label > text').contains(nodeName);
   },
@@ -176,7 +241,7 @@ export const topologyPage = {
       .contains(eventSource);
   },
   getRevisionNode: (serviceName: string) => {
-    cy.get('[data-type="knative-service"] g.pf-topology__group__label > text')
+    cy.get('[data-type="knative-service"] g.pf-topology__group__label > text', { timeout: 80000 })
       .contains(serviceName)
       .should('be.visible');
     return cy.get('[data-type="knative-revision"] ellipse.pf-topology__node__background');
@@ -228,6 +293,9 @@ export const topologyPage = {
   },
   rightClickOnNode: (nodeName: string) => {
     topologyPage.getNode(nodeName).trigger('contextmenu', { force: true });
+  },
+  rightClickOnKnativeNode: (nodeName: string) => {
+    topologyPage.getKnativeNode(nodeName).trigger('contextmenu', { force: true });
   },
   rightClickOnGroup: (releaseName: string) => {
     topologyPage.getGroup(releaseName).trigger('contextmenu', { force: true });
@@ -377,6 +445,25 @@ export const topologyPage = {
       .should('be.visible')
       .click({ force: true });
   },
+  verifyNodeAlert: (nodeName: string) => {
+    cy.get('[data-type="workload"]')
+      .find('.pf-topology__node.pf-m-warning')
+      .contains(nodeName);
+  },
+  verifyListNodeAlert: (nodeName: string) => {
+    cy.get('.odc-topology-list-view__label-cell')
+      .contains(nodeName)
+      .parent()
+      .find('div.odc-topology-list-view__alert-cell')
+      .contains('Alerts:');
+  },
+  clickMaxZoomOut: () => {
+    cy.get(topologyPO.graph.emptyGraph).click();
+    cy.get(topologyPO.graph.reset).click();
+    for (let i = 0; i < 5; i++) {
+      cy.get(topologyPO.graph.zoomOut).click();
+    }
+  },
 };
 
 export const addGitWorkload = (
@@ -419,5 +506,7 @@ export const createServiceBindingConnect = (
     .should('be.visible')
     .click();
   cy.get('#confirm-action').click();
-  cy.get('[data-test-id="edge-handler"]', { timeout: 10000 }).should('be.visible');
+  navigateTo(devNavigationMenu.Add);
+  navigateTo(devNavigationMenu.Topology);
+  cy.get('[data-test-id="edge-handler"]', { timeout: 15000 }).should('be.visible');
 };

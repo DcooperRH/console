@@ -7,6 +7,7 @@ import {
   topologyPage,
   navigateTo,
   createGitWorkloadIfNotExistsOnTopologyPage,
+  gitPage,
 } from '../../pages';
 
 Given('user opened the url of the workload {string} in topology page', (workloadName: string) => {
@@ -38,11 +39,8 @@ When('user clicks on Resources dropdown', () => {
   cy.contains('.pf-c-select__toggle', 'Resources').click();
 });
 
-When('user selects {string}', (resourceType: string) => {
-  cy.get('.pf-m-search')
-    .clear()
-    .type(resourceType);
-  cy.contains('.co-resource-item__resource-name', resourceType).click();
+When('user selects {string} in Resource type section', (resourceType: string) => {
+  gitPage.selectResource(resourceType);
 });
 
 When('user selects Service', () => {

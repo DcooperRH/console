@@ -8,21 +8,40 @@ import {
 import { IncompleteDataError } from '@console/dynamic-plugin-sdk/src/utils/error/http-error';
 import useCatalogExtensions from '../hooks/useCatalogExtensions';
 import { CatalogService } from '../utils';
-import { keywordCompare, applyCatalogItemMetadata } from '../utils/catalog-utils';
+import {
+  keywordCompare,
+  applyCatalogItemMetadata,
+  useGetAllDisabledSubCatalogs,
+} from '../utils/catalog-utils';
 import CatalogExtensionHookResolver from './CatalogExtensionHookResolver';
 
 type CatalogServiceProviderProps = {
   namespace: string;
   catalogId: string;
   catalogType?: string;
+  showAlreadyLoadedItemsAfter?: number;
   children: (service: CatalogService) => React.ReactNode;
 };
 
+/**
+ * Return false until the given timeout time is up, then true.
+ * Restarts the timer when the timeout changes.
+ */
+const useTimeout = (timeout: number) => {
+  const [timeIsUp, setTimeIsUp] = React.useState(false);
+  React.useEffect(() => {
+    const t = timeout > 0 ? setTimeout(() => setTimeIsUp(true), timeout) : null;
+    return () => clearTimeout(t);
+  }, [timeout]);
+  return timeIsUp;
+};
+
 const CatalogServiceProvider: React.FC<CatalogServiceProviderProps> = ({
+  namespace,
   catalogId,
   catalogType,
+  showAlreadyLoadedItemsAfter = 3000,
   children,
-  namespace,
 }) => {
   const defaultOptions: CatalogExtensionHookOptions = { namespace };
   const [
@@ -32,28 +51,35 @@ const CatalogServiceProvider: React.FC<CatalogServiceProviderProps> = ({
     catalogBadgeProviderExtensions,
     extensionsResolved,
   ] = useCatalogExtensions(catalogId, catalogType);
-
+  const [disabledSubCatalogs] = useGetAllDisabledSubCatalogs();
   const [extItemsMap, setExtItemsMap] = React.useState<{ [uid: string]: CatalogItem[] }>({});
   const [extItemsErrorMap, setItemsErrorMap] = React.useState<{ [uid: string]: Error }>({});
   const [metadataProviderMap, setMetadataProviderMap] = React.useState<{
     [type: string]: { [id: string]: CatalogItemMetadataProviderFunction };
   }>({});
 
+  const showAlreadyLoadedItems = useTimeout(showAlreadyLoadedItemsAfter);
+
   const loaded =
     extensionsResolved &&
     (catalogProviderExtensions.length === 0 ||
-      catalogProviderExtensions.every(({ uid }) => extItemsMap[uid] || extItemsErrorMap[uid]));
+      (showAlreadyLoadedItems
+        ? catalogProviderExtensions.some(({ uid }) => extItemsMap[uid] || extItemsErrorMap[uid])
+        : catalogProviderExtensions.every(({ uid }) => extItemsMap[uid] || extItemsErrorMap[uid])));
 
+  const enabledCatalogProviderExtensions = catalogProviderExtensions.filter((item) => {
+    return !disabledSubCatalogs?.includes(item?.properties?.type);
+  });
   const preCatalogItems = React.useMemo(() => {
     if (!loaded) {
       return [];
     }
 
     const itemMap = _.flatten(
-      catalogProviderExtensions.map((e) =>
+      enabledCatalogProviderExtensions.map((e) =>
         catalogFilterExtensions
           .filter((fe) => fe.properties.type === e.properties.type)
-          .reduce((acc, ext) => acc.filter(ext.properties.filter), extItemsMap[e.uid]),
+          .reduce((acc, ext) => acc.filter(ext.properties.filter), extItemsMap[e.uid] ?? []),
       ),
     ).reduce((acc, item) => {
       if (!item) return acc;
@@ -62,7 +88,7 @@ const CatalogServiceProvider: React.FC<CatalogServiceProviderProps> = ({
     }, {} as { [uid: string]: CatalogItem });
 
     return _.sortBy(Object.values(itemMap), 'name');
-  }, [extItemsMap, loaded, catalogProviderExtensions, catalogFilterExtensions]);
+  }, [extItemsMap, loaded, enabledCatalogProviderExtensions, catalogFilterExtensions]);
 
   const catalogItems = React.useMemo(() => {
     if (!loaded) {

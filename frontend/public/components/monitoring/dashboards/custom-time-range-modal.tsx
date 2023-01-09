@@ -4,25 +4,47 @@ import { useTranslation } from 'react-i18next';
 // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
 // @ts-ignore
 import { useDispatch, useSelector } from 'react-redux';
-
-import { DatePicker, TimePicker } from '@patternfly/react-core';
+import {
+  Button,
+  DatePicker,
+  Flex,
+  FlexItem,
+  Modal,
+  ModalVariant,
+  TimePicker,
+} from '@patternfly/react-core';
 
 import { dashboardsSetEndTime, dashboardsSetTimespan } from '../../../actions/observe';
 import { RootState } from '../../../redux';
-import {
-  createModalLauncher,
-  ModalBody,
-  ModalComponentProps,
-  ModalSubmitFooter,
-  ModalTitle,
-} from '../../factory/modal';
-import { toISODateString, twentyFourHourTime } from '../../utils/datetime';
 import { setQueryArguments } from '../../utils';
 
-type CustomTimeRangeModalProps = ModalComponentProps & { activePerspective: string };
+const zeroPad = (number: number) => (number < 10 ? `0${number}` : number);
 
-const CustomTimeRangeModal = ({ cancel, close, activePerspective }: CustomTimeRangeModalProps) => {
+// Get YYYY-MM-DD date string for a date object
+const toISODateString = (date: Date): string =>
+  `${date.getFullYear()}-${zeroPad(date.getMonth() + 1)}-${zeroPad(date.getDate())}`;
+
+// Get HH:MM time string for a date object
+const toISOTimeString = (date: Date): string =>
+  new Intl.DateTimeFormat(
+    'en',
+    // TODO: TypeScript 3 doesn't allow the `hourCycle` attribute so use "as any" until we upgrade
+    { hour: 'numeric', minute: 'numeric', hourCycle: 'h23' } as any,
+  ).format(date);
+
+type CustomTimeRangeModalProps = {
+  activePerspective: string;
+  isOpen: boolean;
+  setClosed: () => void;
+};
+
+const CustomTimeRangeModal: React.FC<CustomTimeRangeModalProps> = ({
+  activePerspective,
+  isOpen,
+  setClosed,
+}) => {
   const { t } = useTranslation();
+
   const dispatch = useDispatch();
   const endTime = useSelector(({ observe }: RootState) =>
     observe.getIn(['dashboards', activePerspective, 'endTime']),
@@ -37,15 +59,14 @@ const CustomTimeRangeModal = ({ cancel, close, activePerspective }: CustomTimeRa
   const defaultFrom = endTime && timespan ? new Date(endTime - timespan) : undefined;
   const [fromDate, setFromDate] = React.useState(toISODateString(defaultFrom ?? now));
   const [fromTime, setFromTime] = React.useState(
-    defaultFrom ? twentyFourHourTime(defaultFrom) : '00:00',
+    defaultFrom ? toISOTimeString(defaultFrom) : '00:00',
   );
   const [toDate, setToDate] = React.useState(toISODateString(endTime ? new Date(endTime) : now));
   const [toTime, setToTime] = React.useState(
-    endTime ? twentyFourHourTime(new Date(endTime)) : '23:59',
+    endTime ? toISOTimeString(new Date(endTime)) : '23:59',
   );
 
-  const submit: React.FormEventHandler<HTMLFormElement> = (e) => {
-    e.preventDefault();
+  const submit: React.MouseEventHandler<HTMLButtonElement> = () => {
     const from = Date.parse(`${fromDate} ${fromTime}`);
     const to = Date.parse(`${toDate} ${toTime}`);
     if (_.isInteger(from) && _.isInteger(to)) {
@@ -55,40 +76,57 @@ const CustomTimeRangeModal = ({ cancel, close, activePerspective }: CustomTimeRa
         endTime: to.toString(),
         timeRange: (to - from).toString(),
       });
-      close();
+      setClosed();
     }
   };
 
   return (
-    <form onSubmit={submit} name="form" className="modal-content">
-      <ModalTitle>{t('public~Custom time range')}</ModalTitle>
-      <ModalBody>
-        <div className="row co-m-form-row">
-          <div className="col-sm-12">
-            <label>{t('public~From')}</label>
-          </div>
-          <div className="col-sm-4">
+    <Modal
+      hasNoBodyWrapper
+      isOpen={isOpen}
+      position="top"
+      showClose={false}
+      title={t('public~Custom time range')}
+      variant={ModalVariant.small}
+    >
+      <Flex className="custom-time-range-modal" direction={{ default: 'column' }}>
+        <FlexItem spacer={{ default: 'spacerNone' }}>
+          <label>{t('public~From')}</label>
+        </FlexItem>
+        <Flex>
+          <FlexItem>
             <DatePicker onChange={(str) => setFromDate(str)} value={fromDate} />
-          </div>
-          <div className="col-sm-4">
+          </FlexItem>
+          <FlexItem>
             <TimePicker is24Hour onChange={setFromTime} time={fromTime} />
-          </div>
-        </div>
-        <div className="row co-m-form-row">
-          <div className="col-sm-12">
-            <label>{t('public~To')}</label>
-          </div>
-          <div className="col-sm-4">
+          </FlexItem>
+        </Flex>
+        <FlexItem spacer={{ default: 'spacerNone' }}>
+          <label>{t('public~To')}</label>
+        </FlexItem>
+        <Flex>
+          <FlexItem>
             <DatePicker onChange={(str) => setToDate(str)} value={toDate} />
-          </div>
-          <div className="col-sm-4">
+          </FlexItem>
+          <FlexItem>
             <TimePicker is24Hour onChange={setToTime} time={toTime} />
-          </div>
-        </div>
-      </ModalBody>
-      <ModalSubmitFooter cancel={cancel} inProgress={false} submitText={t('public~Save')} />
-    </form>
+          </FlexItem>
+        </Flex>
+        <Flex className="custom-time-range-modal-footer">
+          <FlexItem align={{ default: 'alignRight' }}>
+            <Button variant="secondary" onClick={setClosed}>
+              {t('public~Cancel')}
+            </Button>
+          </FlexItem>
+          <FlexItem>
+            <Button variant="primary" onClick={submit}>
+              {t('public~Save')}
+            </Button>
+          </FlexItem>
+        </Flex>
+      </Flex>
+    </Modal>
   );
 };
 
-export default createModalLauncher(CustomTimeRangeModal);
+export default CustomTimeRangeModal;

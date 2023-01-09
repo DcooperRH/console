@@ -35,7 +35,17 @@ type Proxy struct {
 // These headers aren't things that proxies should pass along. Some are forbidden by http2.
 // This fixes the bug where Chrome users saw a ERR_SPDY_PROTOCOL_ERROR for all proxied requests.
 func FilterHeaders(r *http.Response) error {
-	badHeaders := []string{"Connection", "Keep-Alive", "Proxy-Connection", "Transfer-Encoding", "Upgrade"}
+	badHeaders := []string{
+		"Connection",
+		"Keep-Alive",
+		"Proxy-Connection",
+		"Transfer-Encoding",
+		"Upgrade",
+		"Access-Control-Allow-Headers",
+		"Access-Control-Allow-Methods",
+		"Access-Control-Allow-Origin",
+		"Access-Control-Expose-Headers",
+	}
 	for _, h := range badHeaders {
 		r.Header.Del(h)
 	}
@@ -102,7 +112,7 @@ func CopyRequestHeaders(originalRequest, newRequest *http.Request) {
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if klog.V(3) {
-		klog.Infof("PROXY: %#q\n", r.URL)
+		klog.Infof("PROXY: %#q\n", SingleJoiningSlash(p.config.Endpoint.String(), r.URL.Path))
 	}
 
 	// Block scripts from running in proxied content for browsers that support Content-Security-Policy.

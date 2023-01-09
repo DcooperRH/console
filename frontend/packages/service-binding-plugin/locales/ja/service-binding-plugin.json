@@ -1,14 +1,14 @@
 {
   "ServiceBinding": "ServiceBinding",
-  "ServiceBindings": "ServiceBindings",
+  "ServiceBindings": "ServiceBinding",
   "ServiceBinding details": "ServiceBinding の詳細",
   "Conditions": "状態",
   "Status": "ステータス",
   "Application": "アプリケーション",
-  "Services": "サービス",
+  "Services": "Service",
   "Connected": "接続済み",
   "Error": "エラー",
   "Name": "名前",
   "Namespace": "Namespace",
-  "Created": "作成済み"
+  "Created": "作成"
 }

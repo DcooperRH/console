@@ -7,6 +7,7 @@
     "build": "yarn clean && NODE_ENV=production yarn ts-node node_modules/.bin/webpack",
     "build-dev": "yarn clean && yarn ts-node node_modules/.bin/webpack",
     "build-plugin-sdk": "yarn --cwd ../frontend build-plugin-sdk && rm -rf node_modules/@openshift-console && yarn install --check-files",
+    "start-console": "./start-console.sh",
     "http-server": "./http-server.sh dist",
     "i18n": "i18next \"src/**/*.{js,jsx,ts,tsx}\" [-oc] -c i18next-parser.config.js",
     "ts-node": "ts-node -O '{\"module\":\"commonjs\"}'"
@@ -15,9 +16,10 @@
     "@openshift-console/dynamic-plugin-sdk": "file:../frontend/packages/console-dynamic-plugin-sdk/dist/core",
     "@openshift-console/dynamic-plugin-sdk-webpack": "file:../frontend/packages/console-dynamic-plugin-sdk/dist/webpack",
     "@openshift-console/plugin-shared": "file:../frontend/packages/console-plugin-shared/dist",
-    "@patternfly/react-core": "4.162.2",
-    "@patternfly/react-table": "4.31.7",
+    "@patternfly/react-core": "4.235.7",
+    "@patternfly/react-table": "4.104.7",
     "@types/react": "16.8.13",
+    "@types/react-measure": "^2.0.6",
     "@types/react-router-dom": "5.1.2",
     "comment-json": "4.x",
     "copy-webpack-plugin": "^6.4.1",
@@ -54,6 +56,7 @@
       "utilityConsumer": "./components/UtilityConsumer",
       "exampleProxyPage": "./components/ExampleProxyPage",
       "K8sAPIConsumer": "./components/k8sConsumer/K8sAPIConsumer",
+      "exampleNamespacedPage": "./components/ExampleNamespacedPage",
       "navPage": "./components/Nav",
       "listPage": "./components/ListPage",
       "projectTabContent": "./components/ProjectTabExtensionContent",
@@ -62,11 +65,11 @@
       "yamlEditor": "./components/YAMLEditorPage",
       "events": "./components/APIServerEvents",
       "overviewDetailItem": "./components/OverviewDetailItem",
+      "customOverviewDetailItem": "./components/CustomOverviewDetailItem",
       "projectOverviewInventory": "./components/ProjectOverview/Inventory",
-      "projectOverview": "./utils/project-overview"
-    },
-    "dependencies": {
-      "@console/pluginAPI": "*"
+      "projectOverview": "./utils/project-overview",
+      "modalPage": "./components/Modals/ModalPage",
+      "sampleErrorBoundaryPage": "./components/ErrorBoundary/SampleErrorBoundaryPage"
     },
     "disableStaticPlugins": [
       "@console/demo-plugin"

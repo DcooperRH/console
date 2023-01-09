@@ -67,6 +67,7 @@ export const topologyPO = {
     },
     addLink: '[data-test="add-page"]',
     quickSearch: '[data-test="quick-search-bar"]',
+    warningBackground: '[class="pf-topology__node__background pf-m-warning"]',
   },
   list: {
     appName: '#HelmRelease ul li div',
@@ -89,6 +90,7 @@ export const topologyPO = {
     editAnnotations: '[data-test="edit-annotations"]',
     tabName: '[role="dialog"] li button',
     healthCheckAlert: 'div.odc-topology-sidebar-alert',
+    resourceQuotaAlert: 'div.odc-topology-sidebar-alert [aria-label="Warning Alert"]',
     podScale: 'button.pf-c-button.pf-m-plain.pf-m-block',
     podText: 'text.pf-chart-donut-title.pod-ring__center-text',
     applicationGroupingsTitle: '.overview__sidebar-pane-head.resource-overview__heading',
@@ -107,6 +109,8 @@ export const topologyPO = {
       startLastRun: '[role="dialog"] li.list-group-item.pipeline-overview div button',
       pipelineRuns: 'li.odc-pipeline-run-item',
       routeLink: '[data-test-id="route-link"]',
+      waitingPods: 'button[data-test="waiting-pods"]',
+      podTrafficStatus: 'div[data-test="pod-traffic-status',
     },
     monitoringTab: {
       viewMonitoringDashBoardLink: '[data-test="observe-dashboard-link"]',
@@ -176,10 +180,10 @@ export const topologyPO = {
     },
   },
   resourceLimits: {
-    requestCPU: 'input[name="limits.cpu.requestValue"]',
-    limitCPU: 'input[name="limits.cpu.limitValue"]',
-    requestMemory: 'input[name="limits.memory.requestValue"]',
-    limitMemory: 'input[name="limits.memory.limitValue"]',
+    requestCPU: '[aria-describedby="form-resource-limit-limits-cpu-request-field-helper"]',
+    limitCPU: '[aria-describedby="form-resource-limit-limits-cpu-limit-field-helper"]',
+    requestMemory: '[aria-describedby="form-resource-limit-limits-memory-request-field-helper"]',
+    limitMemory: '[aria-describedby="form-resource-limit-limits-memory-limit-field-helper"]',
   },
   deploymentStrategy: {
     strategyTypeDropDown: 'button[id="form-dropdown-formData-deploymentStrategy-type-field"]',
@@ -311,11 +315,22 @@ export const topologyPO = {
     deploymentLabel: '#nodejs-ex-git-app-Deployment-label',
     deployemntCount: '.odc-topology-list-view__group-resource-count',
   },
+  pipelines: {
+    storageNav: '[data-quickstart-id="qs-nav-storage"]',
+    pvcOption: '[href="/k8s/all-namespaces/persistentvolumeclaims"]',
+    pvc: '[aria-label="PersistentVolumeClaims"]',
+    startAction: '[data-test-action="Start"]',
+    pvcIcon: '.co-m-resource-persistentvolumeclaim',
+    addTriggerAction: '[data-test-action="Add Trigger"]',
+    pipelineCheckbox: '#form-checkbox-pipeline-enabled-field',
+    editWorkloadPage: '#content-scrollable',
+    pipelineSection: '.odc-form-section-pipeline',
+  },
 };
 
 export const typeOfWorkload = (workload: string) => {
-  return `[data-test~="icon"][data-test~="${workload
+  return `[data-id="odc-topology-graph"] .odc-resource-icon-${workload
     .toLowerCase()
     .replace(' ', '')
-    .trim()}"]`;
+    .trim()}`;
 };

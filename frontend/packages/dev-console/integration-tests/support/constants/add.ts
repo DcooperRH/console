@@ -14,6 +14,7 @@ export enum addOptions {
   EventSink = 'Event Sink',
   Sharing = 'Sharing',
   HelmChartRepositories = 'Helm Chart Repositories',
+  Samples = 'Samples',
 }
 
 export enum buildConfigOptions {
@@ -36,6 +37,7 @@ export enum gitAdvancedOptions {
   ResourceLimits = 'Resource Limits',
   Labels = 'Labels',
   HealthChecks = 'Health Checks',
+  Resources = 'Resources',
 }
 
 export enum catalogCards {

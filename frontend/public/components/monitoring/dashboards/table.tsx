@@ -1,5 +1,13 @@
 import * as _ from 'lodash-es';
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { PrometheusEndpoint, PrometheusResponse } from '@console/dynamic-plugin-sdk';
+import {
+  EmptyState,
+  EmptyStateBody,
+  EmptyStateVariant,
+  PerPageOptions,
+} from '@patternfly/react-core';
 import {
   ISortBy,
   sortable,
@@ -10,17 +18,13 @@ import {
   TableVariant,
 } from '@patternfly/react-table';
 
-import { PrometheusEndpoint } from '@console/dynamic-plugin-sdk/src/api/common-types';
 import ErrorAlert from '@console/shared/src/components/alerts/error';
 
 import { formatNumber } from '../format';
 import { ColumnStyle, Panel } from './types';
-import { PrometheusResponse } from '../../graphs';
 import { getPrometheusURL } from '../../graphs/helpers';
-import { EmptyBox, usePoll, useSafeFetch } from '../../utils';
+import { usePoll, useSafeFetch } from '../../utils';
 import TablePagination from '../table-pagination';
-
-import { useTranslation } from 'react-i18next';
 
 type AugmentedColumnStyle = ColumnStyle & {
   className?: string;
@@ -54,7 +58,7 @@ const getColumns = (styles: ColumnStyle[]): AugmentedColumnStyle[] => {
   return [...labelColumns, ...valueColumns];
 };
 
-const paginationOptions = [5, 10, 20, 50, 100].map((n) => ({
+const perPageOptions: PerPageOptions[] = [5, 10, 20, 50, 100].map((n) => ({
   title: n.toString(),
   value: n,
 }));
@@ -122,7 +126,11 @@ const Table: React.FC<Props> = ({ panel, pollInterval, queries, namespace }) => 
     return <ErrorAlert message={t('public~panel.styles attribute not found')} />;
   }
   if (_.isEmpty(data)) {
-    return <EmptyBox label={t('public~Data')} />;
+    return (
+      <EmptyState variant={EmptyStateVariant.xs}>
+        <EmptyStateBody>{t('public~No data found')}</EmptyStateBody>
+      </EmptyState>
+    );
   }
 
   const columns: AugmentedColumnStyle[] = getColumns(panel.styles);
@@ -184,9 +192,9 @@ const Table: React.FC<Props> = ({ panel, pollInterval, queries, namespace }) => 
       </div>
       <TablePagination
         itemCount={sortedData.length}
-        paginationOptions={paginationOptions}
         page={page}
         perPage={perPage}
+        perPageOptions={perPageOptions}
         setPage={setPage}
         setPerPage={setPerPage}
       />

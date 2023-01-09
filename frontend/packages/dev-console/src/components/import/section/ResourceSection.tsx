@@ -1,56 +1,62 @@
 import * as React from 'react';
-import { useField } from 'formik';
+import { SelectVariant } from '@patternfly/react-core';
+import { FormikValues, useField, useFormikContext } from 'formik';
+import * as _ from 'lodash';
 import { useTranslation } from 'react-i18next';
 import { getActiveNamespace } from '@console/internal/actions/ui';
 import { useAccessReview } from '@console/internal/components/utils';
 import { DeploymentModel, DeploymentConfigModel } from '@console/internal/models';
-import { K8sKind } from '@console/internal/module/k8s';
 import { connectToFlags } from '@console/internal/reducers/connectToFlags';
 import { FlagsObject } from '@console/internal/reducers/features';
 import { FLAG_KNATIVE_SERVING_SERVICE, ServiceModel } from '@console/knative-plugin';
-import { RadioGroupField, RadioGroupOption } from '@console/shared';
+import { SelectInputField, SelectInputOption } from '@console/shared';
 import { Resources, ReadableResourcesNames } from '../import-types';
 import FormSection from './FormSection';
+import { useResourceType } from './useResourceType';
 import './ResourceSection.scss';
 
 type ResourceSectionProps = {
   flags: FlagsObject;
 };
 
-const createHelpText = (k8sModel: K8sKind, helpText: string) => {
-  return (
-    <>
-      <div className="odc-resource-section__help-text">
-        {k8sModel.apiGroup}/{k8sModel.kind}
-      </div>
-      <div>{helpText}</div>
-    </>
-  );
-};
-
 const ResourceSection: React.FC<ResourceSectionProps> = ({ flags }) => {
   const { t } = useTranslation();
   const [field] = useField<Resources[]>('resourceTypesNotValid');
+  const fieldName = 'resources';
+  const { setFieldValue } = useFormikContext<FormikValues>();
   const invalidTypes = field.value || [];
+
   const knativeServiceAccess = useAccessReview({
     group: ServiceModel.apiGroup,
     resource: ServiceModel.plural,
     namespace: getActiveNamespace(),
     verb: 'create',
   });
+  const canIncludeKnative =
+    !invalidTypes.includes(Resources.KnativeService) &&
+    flags[FLAG_KNATIVE_SERVING_SERVICE] &&
+    knativeServiceAccess;
 
-  const radioOptions = React.useMemo(() => {
-    const options: RadioGroupOption[] = [];
+  const [, setResourceType] = useResourceType();
+
+  const onChange = React.useCallback(
+    (selection: string) => {
+      const value = _.findKey(ReadableResourcesNames, (name) => t(name) === selection);
+      setResourceType(value);
+      setFieldValue(fieldName, value);
+    },
+    [setFieldValue, setResourceType, t],
+  );
+
+  const selectInputOptions = React.useMemo(() => {
+    const options: SelectInputOption[] = [];
     if (!invalidTypes.includes(Resources.Kubernetes)) {
       options.push({
         label: t(ReadableResourcesNames[Resources.Kubernetes]),
         value: Resources.Kubernetes,
-        children: createHelpText(
-          DeploymentModel,
-          t(
-            'devconsole~A {{deploymentLabel}} enables declarative updates for Pods and ReplicaSets.',
-            { deploymentLabel: DeploymentModel.label },
-          ),
+        description: t(
+          'devconsole~A {{deploymentLabel}} enables declarative updates for Pods and ReplicaSets.',
+          { deploymentLabel: DeploymentModel.label },
         ),
       });
     }
@@ -58,37 +64,37 @@ const ResourceSection: React.FC<ResourceSectionProps> = ({ flags }) => {
       options.push({
         label: t(ReadableResourcesNames[Resources.OpenShift]),
         value: Resources.OpenShift,
-        children: createHelpText(
-          DeploymentConfigModel,
-          t(
-            'devconsole~A {{deploymentConfigLabel}} defines the template for a Pod and manages deploying new Images or configuration changes.',
-            { deploymentConfigLabel: DeploymentConfigModel.label },
-          ),
+        description: t(
+          'devconsole~A {{deploymentConfigLabel}} defines the template for a Pod and manages deploying new Images or configuration changes.',
+          { deploymentConfigLabel: DeploymentConfigModel.label },
         ),
       });
     }
 
-    const canIncludeKnative =
-      !invalidTypes.includes(Resources.KnativeService) &&
-      flags[FLAG_KNATIVE_SERVING_SERVICE] &&
-      knativeServiceAccess;
     if (canIncludeKnative) {
       options.push({
         label: t(ReadableResourcesNames[Resources.KnativeService]),
         value: Resources.KnativeService,
-        children: createHelpText(
-          ServiceModel,
-          t('devconsole~A type of deployment that enables Serverless scaling to 0 when idle.'),
+        description: t(
+          'devconsole~A type of deployment that enables Serverless scaling to 0 when idle.',
         ),
       });
     }
     return options;
-  }, [t, invalidTypes, flags, knativeServiceAccess]);
+  }, [invalidTypes, canIncludeKnative, t]);
 
   return (
-    <FormSection title={t('devconsole~Resources')} fullWidth>
+    <FormSection title={t('devconsole~Resource type')} fullWidth>
       <div>{t('devconsole~Select the resource type to generate')}</div>
-      <RadioGroupField name="resources" options={radioOptions} />
+      <SelectInputField
+        name={fieldName}
+        options={selectInputOptions}
+        variant={SelectVariant.single}
+        onChange={onChange}
+        getLabelFromValue={(value: string) => t(ReadableResourcesNames[value])}
+        hideClearButton
+        toggleOnSelection
+      />
     </FormSection>
   );
 };

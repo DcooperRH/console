@@ -9,6 +9,8 @@ import {
 import { Link } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { useClusterVersion, BlueArrowCircleUpIcon, useCanClusterUpgrade } from '@console/shared';
+import { isLoadedDynamicPluginInfo } from '@console/plugin-sdk/src';
+import { useDynamicPluginInfo } from '@console/plugin-sdk/src/api/useDynamicPluginInfo';
 import { getBrandingDetails } from './masthead';
 import {
   ReleaseNotesLink,
@@ -25,6 +27,35 @@ import {
   getOpenShiftVersion,
   hasAvailableUpdates,
 } from '../module/k8s/cluster-settings';
+
+const DynamicPlugins: React.FC = () => {
+  const { t } = useTranslation();
+  const [pluginInfoEntries] = useDynamicPluginInfo();
+  const [items, setItems] = React.useState([]);
+
+  React.useEffect(() => {
+    const loadedPlugins = pluginInfoEntries.filter(isLoadedDynamicPluginInfo);
+    const sortedLoadedPlugins = loadedPlugins.sort((a, b) =>
+      a.metadata.name.localeCompare(b.metadata.name),
+    );
+
+    setItems(
+      sortedLoadedPlugins?.map((plugin) => {
+        return (
+          <TextListItem
+            key={plugin.pluginID}
+          >{`${plugin.metadata.name} (${plugin.metadata.version})`}</TextListItem>
+        );
+      }),
+    );
+  }, [pluginInfoEntries]);
+
+  return items.length > 0 ? (
+    <TextList className="co-text-list-plain">{items}</TextList>
+  ) : (
+    t('public~None')
+  );
+};
 
 const AboutModalItems: React.FC<AboutModalItemsProps> = ({ closeAboutModal }) => {
   const [kubernetesVersion, setKubernetesVersion] = React.useState('');
@@ -112,6 +143,11 @@ const AboutModalItems: React.FC<AboutModalItemsProps> = ({ closeAboutModal }) =>
               </TextListItem>
             </>
           </ServiceLevel>
+
+          <TextListItem component="dt">{t('public~Dynamic plugins')}</TextListItem>
+          <TextListItem component="dd">
+            <DynamicPlugins />
+          </TextListItem>
         </TextList>
       </TextContent>
     </>
